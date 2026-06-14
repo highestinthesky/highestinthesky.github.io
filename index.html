@@ -314,6 +314,7 @@
   .repo-icon.lg { width: 54px; height: 54px; min-width: 54px; border-radius: 15px; font-size: 1.15rem; }
   .card .repo-name { align-items: center; }
   .rn-text { overflow: hidden; text-overflow: ellipsis; }
+  .owner-tag { font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--chip); border: 1px solid var(--card-border); color: var(--text-dim); white-space: nowrap; }
   [data-card] { cursor: pointer; }
   [data-card]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .card .hint {
@@ -489,7 +490,12 @@ const CONFIG = {
   username: "highestinthesky",   //  <-- your GitHub handle
   hideForks: true,        // hide forked repos by default
   hideArchived: false,    // hide archived repos
-  cacheMinutes: 10        // cache API results to respect GitHub rate limits
+  cacheMinutes: 10,       // cache API results to respect GitHub rate limits
+
+  // Show PUBLIC repos that live in organizations too (private repos can't be
+  // shown on a static site — that would require a token).
+  orgs: [],          // e.g. ["my-team-org"]  → pulls ALL public repos from each org
+  extraRepos: ["Rohawklings/32863-ftc"]   // specific repos by "owner/name"
 };
 
 /* ----- small helpers ----- */
@@ -507,6 +513,12 @@ function repoIcon(repo, size) {
   let ini = words.length >= 2 ? (words[0][0] + words[1][0]) : (words[0] || name).slice(0, 2);
   ini = (ini || "?").toUpperCase();
   return `<span class="repo-icon${size === "lg" ? " lg" : ""}" style="background:linear-gradient(135deg,hsl(${hue} 68% 56%),hsl(${hue2} 70% 48%))">${esc(ini)}</span>`;
+}
+// Which account owns a repo, and a small chip for repos not owned by you (e.g. orgs).
+const ownerOf = (repo) => (repo.owner && repo.owner.login) || CONFIG.username;
+function ownerTag(repo) {
+  const o = ownerOf(repo);
+  return o.toLowerCase() === CONFIG.username.toLowerCase() ? "" : `<span class="owner-tag" title="Owned by ${esc(o)}">${esc(o)}</span>`;
 }
 
 const LANG_COLORS = { JavaScript:"#f1e05a", TypeScript:"#3178c6", Python:"#3572A5", HTML:"#e34c26", CSS:"#563d7c", Java:"#b07219", "C++":"#f34b7d", C:"#555555", "C#":"#178600", Go:"#00ADD8", Rust:"#dea584", Ruby:"#701516", PHP:"#4F5D95", Swift:"#F05138", Kotlin:"#A97BFF", Dart:"#00B4AB", Shell:"#89e051", Vue:"#41b883", Jupyter:"#DA5B0B", "Jupyter Notebook":"#DA5B0B", SCSS:"#c6538c", Lua:"#000080" };
@@ -546,9 +558,10 @@ function computeOverrides() {
     name:    DRAFT.name    ?? PUBLISHED.name    ?? "",
     tagline: DRAFT.tagline ?? PUBLISHED.tagline ?? "",
     accent:  DRAFT.accent  ?? PUBLISHED.accent  ?? "",
-    hidden:   DRAFT.hidden   ?? PUBLISHED.hidden   ?? [],
-    featured: DRAFT.featured ?? PUBLISHED.featured ?? [],
-    order:    DRAFT.order    ?? PUBLISHED.order    ?? []
+    hidden:     DRAFT.hidden     ?? PUBLISHED.hidden     ?? [],
+    featured:   DRAFT.featured   ?? PUBLISHED.featured   ?? [],
+    unfeatured: DRAFT.unfeatured ?? PUBLISHED.unfeatured ?? [],
+    order:      DRAFT.order      ?? PUBLISHED.order      ?? []
   };
 }
 
@@ -569,12 +582,11 @@ async function cachedJSON(url, key) {
   } catch (e) { if (cached) return cached.d; throw e; }
 }
 
-async function fetchAllRepos(user) {
+async function fetchPaged(baseUrl, key) {
   let page = 1, all = [];
   while (page <= 5) {
-    const batch = await cachedJSON(
-      `https://api.github.com/users/${user}/repos?per_page=100&sort=updated&page=${page}`,
-      `repos:${user}:${page}`);
+    const sep = baseUrl.includes("?") ? "&" : "?";
+    const batch = await cachedJSON(`${baseUrl}${sep}per_page=100&sort=updated&page=${page}`, `${key}:${page}`);
     if (!Array.isArray(batch) || batch.length === 0) break;
     all = all.concat(batch);
     if (batch.length < 100) break;
@@ -583,13 +595,30 @@ async function fetchAllRepos(user) {
   return all;
 }
 
+// Gather repos from: the user, any listed orgs, and any specific "owner/name" repos.
+async function gatherRepos() {
+  const tasks = [ fetchPaged(`https://api.github.com/users/${CONFIG.username}/repos`, `repos:${CONFIG.username}`) ];
+  (CONFIG.orgs || []).forEach(org =>
+    tasks.push(fetchPaged(`https://api.github.com/orgs/${org}/repos`, `orgrepos:${org}`).catch(() => [])));
+  (CONFIG.extraRepos || []).forEach(full =>
+    tasks.push(cachedJSON(`https://api.github.com/repos/${full}`, `repo:${full}`).then(r => r && r.id ? [r] : []).catch(() => [])));
+
+  const groups = await Promise.all(tasks);
+  const seen = new Set(), merged = [];
+  for (const group of groups) for (const r of group) {
+    if (r && !seen.has(r.id)) { seen.add(r.id); merged.push(r); }
+  }
+  return merged;
+}
+
 /* ===================== PAGES URL ===================== */
 function pagesUrl(repo) {
   if (repo.homepage && /^https?:\/\//.test(repo.homepage)) return repo.homepage;
   if (repo.has_pages) {
-    if (repo.name.toLowerCase() === (CONFIG.username + ".github.io").toLowerCase())
-      return `https://${CONFIG.username}.github.io/`;
-    return `https://${CONFIG.username}.github.io/${repo.name}/`;
+    const owner = (repo.owner && repo.owner.login) || CONFIG.username;
+    if (repo.name.toLowerCase() === (owner + ".github.io").toLowerCase())
+      return `https://${owner}.github.io/`;
+    return `https://${owner}.github.io/${repo.name}/`;
   }
   return null;
 }
@@ -657,6 +686,7 @@ function repoCard(repo, featured) {
       <div class="repo-name">
         ${repoIcon(repo)}
         <span class="rn-text">${esc(repo.name)}</span>
+        ${ownerTag(repo)}
       </div>
       ${live ? '<span class="badge live">● Live</span>' : repo.fork ? '<span class="badge fork">Fork</span>' : repo.archived ? '<span class="badge archived">Archived</span>' : ""}
     </div>
@@ -686,9 +716,25 @@ function visibleRepos() {
   });
 }
 function isFeatured(repo) {
+  // explicit opt-out always wins, so live sites can be un-featured
+  if ((OVERRIDES.unfeatured || []).includes(repo.name)) return false;
   if ((OVERRIDES.featured || []).includes(repo.name)) return true;
-  // auto-feature live sites unless explicitly hidden from featured via order/hidden
+  // otherwise live sites are featured automatically
   return isLive(repo);
+}
+// Toggle a repo's featured state, keeping the override lists minimal.
+function setFeatured(repo, want) {
+  DRAFT.featured   = DRAFT.featured   ?? [...(OVERRIDES.featured   || [])];
+  DRAFT.unfeatured = DRAFT.unfeatured ?? [...(OVERRIDES.unfeatured || [])];
+  const put = (arr, name, add) => { const i = arr.indexOf(name); if (add && i === -1) arr.push(name); else if (!add && i !== -1) arr.splice(i, 1); };
+  const auto = isLive(repo);  // live repos are featured by default
+  if (want) {
+    put(DRAFT.unfeatured, repo.name, false);
+    put(DRAFT.featured,   repo.name, !auto);   // only non-live repos need to be listed
+  } else {
+    put(DRAFT.featured,   repo.name, false);
+    put(DRAFT.unfeatured, repo.name, auto);    // only live repos need an explicit opt-out
+  }
 }
 
 /* ===================== RENDER FEATURED ===================== */
@@ -784,12 +830,12 @@ function buildDevControls() {
   $("#cfg-name").value = DRAFT.name ?? "";
   $("#cfg-tagline").value = DRAFT.tagline ?? "";
   $("#cfg-accent").value = DRAFT.accent ?? "";
+  computeOverrides();
   const hidden = new Set(OVERRIDES.hidden);
-  const featured = new Set(OVERRIDES.featured);
   const order = OVERRIDES.order || [];
   // sort: featured first (by order), then the rest by recent push
   const sorted = [...REPOS].sort((a, b) => {
-    const fa = featured.has(a.name) || isLive(a), fb = featured.has(b.name) || isLive(b);
+    const fa = isFeatured(a), fb = isFeatured(b);
     if (fa !== fb) return fb - fa;
     const ia = order.indexOf(a.name), ib = order.indexOf(b.name);
     if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
@@ -797,7 +843,7 @@ function buildDevControls() {
   });
   $("#dev-repos").innerHTML = sorted.map(r => {
     const isH = hidden.has(r.name);
-    const isF = featured.has(r.name) || isLive(r);
+    const isF = isFeatured(r);
     return `<div class="dev-row ${isH ? "hidden-repo" : ""}" data-repo="${esc(r.name)}">
       <div class="rn"><b>${esc(r.name)}</b><small>${isLive(r) ? "● live · " : ""}${r.language || "—"}</small></div>
       <span class="mini ${isF ? "on" : ""}" data-act="feature" title="Feature">★</span>
@@ -813,12 +859,13 @@ let _pvTimer;
 function livePreview() { clearTimeout(_pvTimer); _pvTimer = setTimeout(renderAllSections, 40); }
 
 // Update one row's button states in place — no list rebuild, so rows never move/jump.
+// Reads from the freshly computed OVERRIDES, so call computeOverrides() first.
 function refreshDevRow(row) {
   const name = row.dataset.repo;
   const repo = REPOS.find(r => r.name === name);
   if (!repo) return;
-  const hidden = (DRAFT.hidden ?? PUBLISHED.hidden ?? []).includes(name);
-  const feat = isLive(repo) || (DRAFT.featured ?? PUBLISHED.featured ?? []).includes(name);
+  const hidden = (OVERRIDES.hidden || []).includes(name);
+  const feat = isFeatured(repo);
   row.classList.toggle("hidden-repo", hidden);
   const star = row.querySelector('[data-act="feature"]');
   if (star) star.classList.toggle("on", feat);
@@ -835,19 +882,16 @@ $("#dev-repos").addEventListener("click", (e) => {
   const mini = e.target.closest(".mini"); if (!mini) return;
   const row = e.target.closest("[data-repo]"); if (!row) return;
   const name = row.dataset.repo;
+  const repo = REPOS.find(r => r.name === name);
   const act = mini.dataset.act;
-  DRAFT.hidden   = DRAFT.hidden   ?? [...(OVERRIDES.hidden   || [])];
-  DRAFT.featured = DRAFT.featured ?? [...(OVERRIDES.featured || [])];
-  DRAFT.order    = DRAFT.order    ?? [...(OVERRIDES.order    || [])];
+  DRAFT.hidden = DRAFT.hidden ?? [...(OVERRIDES.hidden || [])];
+  DRAFT.order  = DRAFT.order  ?? [...(OVERRIDES.order  || [])];
 
   if (act === "show") {
     const i = DRAFT.hidden.indexOf(name);
     if (i === -1) DRAFT.hidden.push(name); else DRAFT.hidden.splice(i, 1);
-    refreshDevRow(row);
   } else if (act === "feature") {
-    const i = DRAFT.featured.indexOf(name);
-    if (i === -1) DRAFT.featured.push(name); else DRAFT.featured.splice(i, 1);
-    refreshDevRow(row);
+    setFeatured(repo, !isFeatured(repo));   // true toggle, even for live repos
   } else if (act === "up" || act === "down") {
     const sib = act === "up" ? row.previousElementSibling : row.nextElementSibling;
     if (sib && sib.matches("[data-repo]")) {
@@ -859,6 +903,7 @@ $("#dev-repos").addEventListener("click", (e) => {
   }
   saveDraft();
   computeOverrides();
+  if (act === "show" || act === "feature") refreshDevRow(row);
   livePreview();
 });
 
@@ -884,8 +929,9 @@ function buildConfigObject() {
   if (OVERRIDES.tagline) out.tagline = OVERRIDES.tagline;
   if (OVERRIDES.accent)  out.accent = OVERRIDES.accent;
   if (OVERRIDES.hidden && OVERRIDES.hidden.length)     out.hidden = OVERRIDES.hidden;
-  if (OVERRIDES.featured && OVERRIDES.featured.length) out.featured = OVERRIDES.featured;
-  if (OVERRIDES.order && OVERRIDES.order.length)       out.order = OVERRIDES.order;
+  if (OVERRIDES.featured && OVERRIDES.featured.length)     out.featured = OVERRIDES.featured;
+  if (OVERRIDES.unfeatured && OVERRIDES.unfeatured.length) out.unfeatured = OVERRIDES.unfeatured;
+  if (OVERRIDES.order && OVERRIDES.order.length)           out.order = OVERRIDES.order;
   return out;
 }
 
@@ -947,6 +993,7 @@ function openPreview(repo) {
         <h3>${esc(repo.name)}</h3>
         <div class="pm-sub">
           ${live ? '<span class="badge live">● Live</span>' : repo.fork ? '<span class="badge fork">Fork</span>' : ""}
+          ${ownerTag(repo)}
           ${repo.language ? `<span class="lang"><span class="lang-dot" style="background:${langColor(repo.language)}"></span>${esc(repo.language)}</span>` : ""}
           ${updated ? `<span>updated ${updated}</span>` : ""}
         </div>
@@ -1012,7 +1059,7 @@ async function boot() {
   }
   try {
     PROFILE = await cachedJSON(`https://api.github.com/users/${CONFIG.username}`, "user:" + CONFIG.username);
-    REPOS = await fetchAllRepos(CONFIG.username);
+    REPOS = await gatherRepos();
     populateLangFilter();
     renderAllSections();
   } catch (e) {

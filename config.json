@@ -3,12 +3,11 @@
     "wordlebot"
   ],
   "featured": [
-    "wordlebot",
+    "32863-ftc",
     "32863-ftc-2",
     "algorithm-visualizer"
   ],
   "order": [
-    "wordlebot",
     "highestinthesky.github.io",
     "password-manager",
     "frc-scouting-app"
