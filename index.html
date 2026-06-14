@@ -302,6 +302,8 @@
     .hero { padding: 36px 0 14px; }
     .hero-card { padding: 22px; }
     .stats { width: 100%; }
+    .grid { grid-template-columns: 1fr; }
+    .controls { gap: 10px; }
   }
 
   /* ---------- Default repo icon (monogram) ---------- */
@@ -326,11 +328,12 @@
   .card .hint svg { width: 13px; height: 13px; }
 
   /* ---------- Card image banner ---------- */
-  .card-banner { position: relative; width: 100%; aspect-ratio: 2 / 1; overflow: hidden; background: var(--card); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--card-border); }
-  .banner-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; z-index: 1; }
+  .card-banner { position: relative; width: 100%; aspect-ratio: 5 / 2; overflow: hidden; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--card-border); }
+  .banner-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; z-index: 1; }
+  .banner-avatar { position: relative; z-index: 1; width: 76px; height: 76px; border-radius: 20px; object-fit: cover; border: 2px solid rgba(255,255,255,.4); box-shadow: 0 6px 22px rgba(0,0,0,.35); background: var(--card); }
   .banner-fallback { position: relative; z-index: 0; }
-  .banner-badge { position: absolute; top: 10px; left: 10px; z-index: 2; }
   .card-body { display: flex; flex-direction: column; gap: 10px; padding: 18px; flex: 1; }
+  .card .top { flex-wrap: wrap; }
 
   /* ---------- Preview modal ---------- */
   .modal-overlay { position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.55); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
@@ -536,6 +539,13 @@ function ogImage(repo) {
 }
 // Card image: a custom override if provided, otherwise the GitHub preview image.
 const repoImage = (repo) => (CONFIG.images && CONFIG.images[repo.name]) || ogImage(repo);
+// Clean banner pieces: the owner's avatar (a real image) and a per-repo gradient.
+const ownerAvatar = (repo) => (repo.owner && repo.owner.avatar_url) || (PROFILE && PROFILE.avatar_url) || "";
+function repoGradient(name) {
+  let h = 0; for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = h % 360, hue2 = (hue + 38) % 360;
+  return `linear-gradient(135deg, hsl(${hue} 58% 40%), hsl(${hue2} 60% 28%))`;
+}
 function ownerTag(repo) {
   const o = ownerOf(repo);
   return o.toLowerCase() === CONFIG.username.toLowerCase() ? "" : `<span class="owner-tag" title="Owned by ${esc(o)}">${esc(o)}</span>`;
@@ -699,12 +709,15 @@ function renderHero() {
 function repoCard(repo, featured) {
   const live = pagesUrl(repo);
   const topics = (repo.topics || []).slice(0, 4);
+  const customImg = (CONFIG.images && CONFIG.images[repo.name]) || "";
+  const avatar = ownerAvatar(repo);
   return `
   <article class="card ${featured ? "featured" : ""}" data-card data-name="${esc(repo.name)}" tabindex="0" role="button" aria-label="Preview ${esc(repo.name)}">
-    <div class="card-banner">
+    <div class="card-banner" style="background:${repoGradient(repo.name)}">
       <span class="banner-fallback">${repoIcon(repo, "lg")}</span>
-      <img class="banner-img" src="${esc(repoImage(repo))}" alt="" loading="lazy" onerror="this.remove()" />
-      ${live ? '<span class="badge live banner-badge">● Live</span>' : repo.fork ? '<span class="badge fork banner-badge">Fork</span>' : repo.archived ? '<span class="badge archived banner-badge">Archived</span>' : ""}
+      ${customImg
+        ? `<img class="banner-cover" src="${esc(customImg)}" alt="" loading="lazy" onerror="this.remove()" />`
+        : (avatar ? `<img class="banner-avatar" src="${esc(avatar)}" alt="" loading="lazy" onerror="this.remove()" />` : "")}
       <span class="hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>preview</span>
     </div>
     <div class="card-body">
@@ -713,6 +726,7 @@ function repoCard(repo, featured) {
           <span class="rn-text">${esc(repo.name)}</span>
           ${ownerTag(repo)}
         </div>
+        ${live ? '<span class="badge live">● Live</span>' : repo.fork ? '<span class="badge fork">Fork</span>' : repo.archived ? '<span class="badge archived">Archived</span>' : ""}
       </div>
       <p class="desc">${esc(repo.description || "No description provided.")}</p>
       ${topics.length ? `<div class="topics">${topics.map(t => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
