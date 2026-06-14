@@ -5,7 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Portfolio</title>
 <meta name="description" content="A showcase of my projects and live work on GitHub." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c3aed'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M16 6.5l2.6 5.5 6 .8-4.4 4.1 1.1 6L16 26l-5.3 2.9 1.1-6-4.4-4.1 6-.8z' fill='%23fff'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://api.github.com" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<!-- Close free fallback for Anthropic Sans. To use the real Anthropic Sans for ALL
+     visitors, host your licensed .woff2 files and add an @font-face with a src: url(...). -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
   /* =========================================================
      THEME TOKENS  (auto light/dark via prefers-color-scheme,
@@ -16,7 +22,7 @@
     --accent-2: #ec4899;
     --radius: 18px;
     --maxw: 1140px;
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font: "Anthropic Sans", "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
   }
   /* Dark by default tokens */
@@ -66,6 +72,15 @@
       --shadow: 0 10px 40px rgba(60, 60, 120, 0.12);
       --chip: rgba(20, 22, 40, 0.06);
     }
+  }
+
+  /* Use Anthropic Sans if the viewer has it installed; otherwise the web fallback.
+     Drop in licensed .woff2 files via a src: url(...) here to serve it to everyone. */
+  @font-face {
+    font-family: "Anthropic Sans";
+    src: local("Anthropic Sans"), local("AnthropicSans"), local("Anthropic-Sans");
+    font-weight: 100 900;
+    font-display: swap;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -286,6 +301,53 @@
     .hero-card { padding: 22px; }
     .stats { width: 100%; }
   }
+
+  /* ---------- Default repo icon (monogram) ---------- */
+  .repo-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; min-width: 38px; border-radius: 11px;
+    color: #fff; font-weight: 800; font-size: .82rem; letter-spacing: .02em;
+    box-shadow: 0 4px 14px rgba(0,0,0,.18); flex: none;
+  }
+  .repo-icon.lg { width: 54px; height: 54px; min-width: 54px; border-radius: 15px; font-size: 1.15rem; }
+  .card .repo-name { align-items: center; }
+  .rn-text { overflow: hidden; text-overflow: ellipsis; }
+  [data-card] { cursor: pointer; }
+  [data-card]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .card .hint {
+    position: absolute; top: 12px; right: 12px; opacity: 0; transition: opacity .2s ease;
+    color: var(--text-faint); font-size: .72rem; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .card:hover .hint, [data-card]:focus-visible .hint { opacity: .9; }
+  .card .hint svg { width: 13px; height: 13px; }
+
+  /* ---------- Preview modal ---------- */
+  .modal-overlay { position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.55); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+  .modal-overlay.open { opacity: 1; pointer-events: auto; }
+  .modal-wrap { position: fixed; inset: 0; z-index: 160; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+  .modal-wrap.open { opacity: 1; pointer-events: auto; }
+  .modal {
+    width: min(740px, 100%); max-height: 90vh; overflow-y: auto; position: relative; padding: 24px;
+    background: var(--glass); border: 1px solid var(--card-border); border-radius: 24px; box-shadow: var(--shadow);
+    backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%);
+    transform: translateY(12px) scale(.985); transition: transform .26s cubic-bezier(.4,0,.2,1);
+  }
+  .modal-wrap.open .modal { transform: none; }
+  .modal-close { position: absolute; top: 15px; right: 15px; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--chip); color: var(--text); cursor: pointer; font-size: .9rem; z-index: 2; }
+  .modal-close:hover { background: var(--card-hover); }
+  .pm-head { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; padding-right: 42px; }
+  .pm-title h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; word-break: break-word; }
+  .pm-sub { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; color: var(--text-dim); font-size: .85rem; margin-top: 4px; }
+  .pm-sub .lang { display: inline-flex; align-items: center; gap: 6px; }
+  .pm-frame { position: relative; width: 100%; aspect-ratio: 16 / 10; border-radius: 16px; overflow: hidden; border: 1px solid var(--card-border); background: var(--card); margin-bottom: 16px; }
+  .pm-frame.static { aspect-ratio: 2 / 1; }
+  .pm-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+  .pm-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pm-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: .9rem; gap: 8px; }
+  .pm-desc { color: var(--text-dim); margin-bottom: 12px; }
+  .pm-stats { color: var(--text-dim); font-size: .88rem; margin-bottom: 16px; }
+  .modal .topics { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -365,6 +427,12 @@
   </div>
 </footer>
 
+<!-- ============ REPO PREVIEW MODAL ============ -->
+<div class="modal-overlay" id="preview-overlay"></div>
+<div class="modal-wrap" id="preview-wrap" aria-hidden="true">
+  <div class="modal" id="preview-modal" role="dialog" aria-modal="true"></div>
+</div>
+
 <!-- ============ DEVELOPER PANEL ============ -->
 <button class="dev-fab" id="dev-fab" title="Developer panel" aria-label="Open developer panel">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
@@ -427,6 +495,17 @@ const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s = "") => s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 2200); };
+
+/* Deterministic default icon: hashed gradient + initials, unique per repo name. */
+function repoIcon(repo, size) {
+  const name = repo.name || "";
+  let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = h % 360, hue2 = (hue + 38) % 360;
+  const words = name.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+  let ini = words.length >= 2 ? (words[0][0] + words[1][0]) : (words[0] || name).slice(0, 2);
+  ini = (ini || "?").toUpperCase();
+  return `<span class="repo-icon${size === "lg" ? " lg" : ""}" style="background:linear-gradient(135deg,hsl(${hue} 68% 56%),hsl(${hue2} 70% 48%))">${esc(ini)}</span>`;
+}
 
 const LANG_COLORS = { JavaScript:"#f1e05a", TypeScript:"#3178c6", Python:"#3572A5", HTML:"#e34c26", CSS:"#563d7c", Java:"#b07219", "C++":"#f34b7d", C:"#555555", "C#":"#178600", Go:"#00ADD8", Rust:"#dea584", Ruby:"#701516", PHP:"#4F5D95", Swift:"#F05138", Kotlin:"#A97BFF", Dart:"#00B4AB", Shell:"#89e051", Vue:"#41b883", Jupyter:"#DA5B0B", "Jupyter Notebook":"#DA5B0B", SCSS:"#c6538c", Lua:"#000080" };
 const langColor = (l) => LANG_COLORS[l] || "#9099a8";
@@ -570,11 +649,12 @@ function repoCard(repo, featured) {
   const live = pagesUrl(repo);
   const topics = (repo.topics || []).slice(0, 4);
   return `
-  <article class="card ${featured ? "featured" : ""}" data-card>
+  <article class="card ${featured ? "featured" : ""}" data-card data-name="${esc(repo.name)}" tabindex="0" role="button" aria-label="Preview ${esc(repo.name)}">
+    <span class="hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>preview</span>
     <div class="top">
       <div class="repo-name">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z"/></svg>
-        ${esc(repo.name)}
+        ${repoIcon(repo)}
+        <span class="rn-text">${esc(repo.name)}</span>
       </div>
       ${live ? '<span class="badge live">● Live</span>' : repo.fork ? '<span class="badge fork">Fork</span>' : repo.archived ? '<span class="badge archived">Archived</span>' : ""}
     </div>
@@ -811,6 +891,83 @@ $("#dev-reset").addEventListener("click", () => {
   $("#sort").addEventListener("change", renderAll);
   $("#show-forks").addEventListener("change", renderAll);
 });
+
+/* ===================== REPO PREVIEW MODAL ===================== */
+function openPreview(repo) {
+  const live = pagesUrl(repo);
+  const owner = (repo.owner && repo.owner.login) || CONFIG.username;
+  const cb = encodeURIComponent(repo.pushed_at || String(repo.id) || "1");
+  const og = `https://opengraph.githubassets.com/${cb}/${owner}/${repo.name}`;
+  const topics = (repo.topics || []).map(t => `<span class="topic">${esc(t)}</span>`).join("");
+  let updated = "";
+  try { updated = new Date(repo.pushed_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); } catch {}
+
+  const previewBlock = live
+    ? `<div class="pm-frame">
+         <div class="pm-loading">Loading live preview…</div>
+         <iframe src="${esc(live)}" loading="lazy" referrerpolicy="no-referrer"
+           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+           onload="this.previousElementSibling.style.display='none'"></iframe>
+       </div>`
+    : `<div class="pm-frame static"><img src="${esc(og)}" alt="${esc(repo.name)} preview" loading="lazy"
+         onerror="this.closest('.pm-frame').style.display='none'" /></div>`;
+
+  $("#preview-modal").innerHTML = `
+    <button class="modal-close" aria-label="Close preview">✕</button>
+    <div class="pm-head">
+      ${repoIcon(repo, "lg")}
+      <div class="pm-title">
+        <h3>${esc(repo.name)}</h3>
+        <div class="pm-sub">
+          ${live ? '<span class="badge live">● Live</span>' : repo.fork ? '<span class="badge fork">Fork</span>' : ""}
+          ${repo.language ? `<span class="lang"><span class="lang-dot" style="background:${langColor(repo.language)}"></span>${esc(repo.language)}</span>` : ""}
+          ${updated ? `<span>updated ${updated}</span>` : ""}
+        </div>
+      </div>
+    </div>
+    ${previewBlock}
+    <p class="pm-desc">${esc(repo.description || "No description provided.")}</p>
+    ${topics ? `<div class="topics">${topics}</div>` : ""}
+    <div class="pm-stats">★ ${repo.stargazers_count} &nbsp;·&nbsp; ⑂ ${repo.forks_count}${repo.open_issues_count ? ` &nbsp;·&nbsp; ${repo.open_issues_count} open issues` : ""}</div>
+    <div class="modal-actions">
+      ${live ? `<a class="btn primary" href="${esc(live)}" target="_blank" rel="noopener">Open live ↗</a>` : ""}
+      <a class="btn" href="${esc(repo.html_url)}" target="_blank" rel="noopener">View code on GitHub</a>
+    </div>`;
+
+  $("#preview-wrap").classList.add("open");
+  $("#preview-overlay").classList.add("open");
+  $("#preview-wrap").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+function closePreview() {
+  $("#preview-wrap").classList.remove("open");
+  $("#preview-overlay").classList.remove("open");
+  $("#preview-wrap").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+  $("#preview-modal").innerHTML = "";  // stop the iframe
+}
+// open on card click (but let real links/buttons work)
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".modal-close")) { closePreview(); return; }
+  const card = e.target.closest("[data-card]");
+  if (!card) return;
+  if (e.target.closest("a, button, .btn")) return;
+  const repo = REPOS.find(r => r.name === card.dataset.name);
+  if (repo) openPreview(repo);
+});
+// keyboard: Enter/Space activates a focused card, Esc closes
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $("#preview-wrap").classList.contains("open")) { closePreview(); return; }
+  if ((e.key === "Enter" || e.key === " ")) {
+    const c = document.activeElement;
+    if (c && c.matches && c.matches("[data-card]")) {
+      e.preventDefault();
+      const repo = REPOS.find(r => r.name === c.dataset.name);
+      if (repo) openPreview(repo);
+    }
+  }
+});
+$("#preview-overlay").addEventListener("click", closePreview);
 
 /* ===================== BOOT ===================== */
 async function boot() {
