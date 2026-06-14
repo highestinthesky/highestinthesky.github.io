@@ -193,7 +193,7 @@
   .card {
     position: relative; display: flex; flex-direction: column; gap: 10px;
     background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
-    padding: 20px; min-height: 168px; overflow: hidden;
+    padding: 0; gap: 0; overflow: hidden;
     transition: transform .18s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;
     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   }
@@ -318,11 +318,19 @@
   [data-card] { cursor: pointer; }
   [data-card]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .card .hint {
-    position: absolute; top: 12px; right: 12px; opacity: 0; transition: opacity .2s ease;
-    color: var(--text-faint); font-size: .72rem; display: inline-flex; align-items: center; gap: 4px;
+    position: absolute; top: 10px; right: 10px; opacity: 0; transition: opacity .2s ease; z-index: 3;
+    color: #fff; font-size: .72rem; display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(0,0,0,.55); padding: 4px 9px; border-radius: 999px; backdrop-filter: blur(4px);
   }
-  .card:hover .hint, [data-card]:focus-visible .hint { opacity: .9; }
+  .card:hover .hint, [data-card]:focus-visible .hint { opacity: 1; }
   .card .hint svg { width: 13px; height: 13px; }
+
+  /* ---------- Card image banner ---------- */
+  .card-banner { position: relative; width: 100%; aspect-ratio: 2 / 1; overflow: hidden; background: var(--card); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--card-border); }
+  .banner-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; z-index: 1; }
+  .banner-fallback { position: relative; z-index: 0; }
+  .banner-badge { position: absolute; top: 10px; left: 10px; z-index: 2; }
+  .card-body { display: flex; flex-direction: column; gap: 10px; padding: 18px; flex: 1; }
 
   /* ---------- Preview modal ---------- */
   .modal-overlay { position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.55); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
@@ -488,14 +496,19 @@
    ===================================================================== */
 const CONFIG = {
   username: "highestinthesky",   //  <-- your GitHub handle
-  hideForks: true,        // hide forked repos by default
+  hideForks: false,       // show forked repos by default (toggle still available)
   hideArchived: false,    // hide archived repos
   cacheMinutes: 10,       // cache API results to respect GitHub rate limits
 
   // Show PUBLIC repos that live in organizations too (private repos can't be
   // shown on a static site — that would require a token).
   orgs: [],          // e.g. ["my-team-org"]  → pulls ALL public repos from each org
-  extraRepos: ["Rohawklings/32863-ftc"]   // specific repos by "owner/name"
+  extraRepos: ["Rohawklings/32863-ftc"],   // specific repos by "owner/name"
+
+  // Each card shows a real image. By default it uses GitHub's auto-generated preview
+  // image (set a repo's "Social preview" in its GitHub Settings to customize it).
+  // You can also hard-override any card here with your own image URL:
+  images: {}        // e.g. { "my-repo": "https://example.com/screenshot.png" }
 };
 
 /* ----- small helpers ----- */
@@ -516,6 +529,13 @@ function repoIcon(repo, size) {
 }
 // Which account owns a repo, and a small chip for repos not owned by you (e.g. orgs).
 const ownerOf = (repo) => (repo.owner && repo.owner.login) || CONFIG.username;
+// GitHub's auto-generated social/preview image for a repo (an actual image per repo).
+function ogImage(repo) {
+  const cb = encodeURIComponent(repo.pushed_at || String(repo.id) || "1");
+  return `https://opengraph.githubassets.com/${cb}/${ownerOf(repo)}/${repo.name}`;
+}
+// Card image: a custom override if provided, otherwise the GitHub preview image.
+const repoImage = (repo) => (CONFIG.images && CONFIG.images[repo.name]) || ogImage(repo);
 function ownerTag(repo) {
   const o = ownerOf(repo);
   return o.toLowerCase() === CONFIG.username.toLowerCase() ? "" : `<span class="owner-tag" title="Owned by ${esc(o)}">${esc(o)}</span>`;
@@ -681,27 +701,32 @@ function repoCard(repo, featured) {
   const topics = (repo.topics || []).slice(0, 4);
   return `
   <article class="card ${featured ? "featured" : ""}" data-card data-name="${esc(repo.name)}" tabindex="0" role="button" aria-label="Preview ${esc(repo.name)}">
-    <span class="hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>preview</span>
-    <div class="top">
-      <div class="repo-name">
-        ${repoIcon(repo)}
-        <span class="rn-text">${esc(repo.name)}</span>
-        ${ownerTag(repo)}
+    <div class="card-banner">
+      <span class="banner-fallback">${repoIcon(repo, "lg")}</span>
+      <img class="banner-img" src="${esc(repoImage(repo))}" alt="" loading="lazy" onerror="this.remove()" />
+      ${live ? '<span class="badge live banner-badge">● Live</span>' : repo.fork ? '<span class="badge fork banner-badge">Fork</span>' : repo.archived ? '<span class="badge archived banner-badge">Archived</span>' : ""}
+      <span class="hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>preview</span>
+    </div>
+    <div class="card-body">
+      <div class="top">
+        <div class="repo-name">
+          <span class="rn-text">${esc(repo.name)}</span>
+          ${ownerTag(repo)}
+        </div>
       </div>
-      ${live ? '<span class="badge live">● Live</span>' : repo.fork ? '<span class="badge fork">Fork</span>' : repo.archived ? '<span class="badge archived">Archived</span>' : ""}
-    </div>
-    <p class="desc">${esc(repo.description || "No description provided.")}</p>
-    ${topics.length ? `<div class="topics">${topics.map(t => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
-    <div class="foot">
-      ${repo.language ? `<span class="lang"><span class="lang-dot" style="background:${langColor(repo.language)}"></span>${esc(repo.language)}</span>` : ""}
-      ${repo.stargazers_count ? `<span>★ ${repo.stargazers_count}</span>` : ""}
-      ${repo.forks_count ? `<span>⑂ ${repo.forks_count}</span>` : ""}
-    </div>
-    <div class="actions">
-      ${live ? `<a class="btn primary" href="${esc(live)}" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>View live</a>` : ""}
-      <a class="btn" href="${esc(repo.html_url)}" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.6 18 4.9 18 4.9c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>Code</a>
+      <p class="desc">${esc(repo.description || "No description provided.")}</p>
+      ${topics.length ? `<div class="topics">${topics.map(t => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
+      <div class="foot">
+        ${repo.language ? `<span class="lang"><span class="lang-dot" style="background:${langColor(repo.language)}"></span>${esc(repo.language)}</span>` : ""}
+        ${repo.stargazers_count ? `<span>★ ${repo.stargazers_count}</span>` : ""}
+        ${repo.forks_count ? `<span>⑂ ${repo.forks_count}</span>` : ""}
+      </div>
+      <div class="actions">
+        ${live ? `<a class="btn primary" href="${esc(live)}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>View live</a>` : ""}
+        <a class="btn" href="${esc(repo.html_url)}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.6 18 4.9 18 4.9c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>Code</a>
+      </div>
     </div>
   </article>`;
 }
@@ -766,7 +791,7 @@ function renderAll() {
   const showForks = $("#show-forks").checked;
 
   let list = visibleRepos().filter(r => {
-    if (!showForks && CONFIG.hideForks && r.fork) return false;
+    if (!showForks && r.fork) return false;
     if (lang && r.language !== lang) return false;
     if (q) {
       const hay = [r.name, r.description, r.language, ...(r.topics || [])].join(" ").toLowerCase();
@@ -958,6 +983,7 @@ $("#dev-reset").addEventListener("click", () => {
 });
 
 /* ===================== WIRE UP CONTROLS ===================== */
+$("#show-forks").checked = !CONFIG.hideForks;   // reflect the default
 ["input", "change"].forEach(ev => {
   $("#search").addEventListener(ev, renderAll);
   $("#lang-filter").addEventListener("change", renderAll);
