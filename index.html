@@ -285,7 +285,9 @@
   .dev-row .rn b { display: block; font-size: .9rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dev-row .rn small { color: var(--text-faint); font-size: .74rem; }
   .dev-row.hidden-repo { opacity: .5; }
-  .mini { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 700; padding: 5px 9px; border-radius: 9px; border: 1px solid var(--card-border); background: var(--chip); color: var(--text); cursor: pointer; user-select: none; }
+  .mini { display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: .82rem; font-weight: 700; min-width: 36px; min-height: 36px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--chip); color: var(--text); cursor: pointer; user-select: none; touch-action: manipulation; transition: background .12s ease, transform .08s ease; }
+  .mini:hover { background: var(--card-hover); }
+  .mini:active { transform: scale(.92); }
   .mini.on { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: none; }
   .mini svg { width: 13px; height: 13px; }
   .dev-foot { padding: 14px 20px; border-top: 1px solid var(--card-border); display: flex; flex-direction: column; gap: 9px; }
@@ -806,10 +808,33 @@ function buildDevControls() {
   }).join("");
 }
 
-// delegated clicks inside dev repo list
+// Debounced live preview so rapid clicks stay snappy and never block the UI.
+let _pvTimer;
+function livePreview() { clearTimeout(_pvTimer); _pvTimer = setTimeout(renderAllSections, 40); }
+
+// Update one row's button states in place — no list rebuild, so rows never move/jump.
+function refreshDevRow(row) {
+  const name = row.dataset.repo;
+  const repo = REPOS.find(r => r.name === name);
+  if (!repo) return;
+  const hidden = (DRAFT.hidden ?? PUBLISHED.hidden ?? []).includes(name);
+  const feat = isLive(repo) || (DRAFT.featured ?? PUBLISHED.featured ?? []).includes(name);
+  row.classList.toggle("hidden-repo", hidden);
+  const star = row.querySelector('[data-act="feature"]');
+  if (star) star.classList.toggle("on", feat);
+  const show = row.querySelector('[data-act="show"]');
+  if (show) { show.classList.toggle("on", !hidden); show.textContent = hidden ? "Hidden" : "Shown"; }
+}
+// Featured order follows the visual order of the rows in the panel.
+function syncOrderFromDom() {
+  DRAFT.order = [...document.querySelectorAll("#dev-repos [data-repo]")].map(el => el.dataset.repo);
+}
+
+// Delegated clicks inside the dev repo list (updates happen in place).
 $("#dev-repos").addEventListener("click", (e) => {
   const mini = e.target.closest(".mini"); if (!mini) return;
-  const row = e.target.closest("[data-repo]"); const name = row.dataset.repo;
+  const row = e.target.closest("[data-repo]"); if (!row) return;
+  const name = row.dataset.repo;
   const act = mini.dataset.act;
   DRAFT.hidden   = DRAFT.hidden   ?? [...(OVERRIDES.hidden   || [])];
   DRAFT.featured = DRAFT.featured ?? [...(OVERRIDES.featured || [])];
@@ -818,21 +843,23 @@ $("#dev-repos").addEventListener("click", (e) => {
   if (act === "show") {
     const i = DRAFT.hidden.indexOf(name);
     if (i === -1) DRAFT.hidden.push(name); else DRAFT.hidden.splice(i, 1);
+    refreshDevRow(row);
   } else if (act === "feature") {
     const i = DRAFT.featured.indexOf(name);
     if (i === -1) DRAFT.featured.push(name); else DRAFT.featured.splice(i, 1);
+    refreshDevRow(row);
   } else if (act === "up" || act === "down") {
-    if (!DRAFT.order.includes(name)) {
-      // seed order from current featured display order
-      const order = OVERRIDES.order && OVERRIDES.order.length ? [...OVERRIDES.order]
-        : visibleRepos().filter(isFeatured).map(r => r.name);
-      DRAFT.order = order.includes(name) ? order : [...order, name];
+    const sib = act === "up" ? row.previousElementSibling : row.nextElementSibling;
+    if (sib && sib.matches("[data-repo]")) {
+      if (act === "up") row.parentNode.insertBefore(row, sib);
+      else row.parentNode.insertBefore(sib, row);
+      syncOrderFromDom();
+      row.scrollIntoView({ block: "nearest" });
     }
-    const i = DRAFT.order.indexOf(name);
-    const j = act === "up" ? i - 1 : i + 1;
-    if (j >= 0 && j < DRAFT.order.length) { [DRAFT.order[i], DRAFT.order[j]] = [DRAFT.order[j], DRAFT.order[i]]; }
   }
-  saveDraft(); renderAllSections(); buildDevControls();
+  saveDraft();
+  computeOverrides();
+  livePreview();
 });
 
 // text inputs (debounced)
