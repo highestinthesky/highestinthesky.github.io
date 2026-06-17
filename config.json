@@ -1,12 +1,11 @@
 {
-  "hidden": [],
-  "unfeatured": [
-    "wordlebot"
-  ],
   "featured": [
     "32863-ftc",
     "32863-ftc-2",
     "algorithm-visualizer"
+  ],
+  "unfeatured": [
+    "wordlebot"
   ],
   "order": [
     "highestinthesky.github.io",
