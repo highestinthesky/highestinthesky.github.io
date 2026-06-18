@@ -493,6 +493,8 @@
 </aside>
 <div class="toast" id="toast"></div>
 
+<!-- anime.js — fun, lightweight animations (degrades gracefully if blocked) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
 <script>
 /* =====================================================================
    CONFIG — set your GitHub username here (the only required edit).
@@ -546,6 +548,51 @@ function repoGradient(name) {
   const hue = h % 360, hue2 = (hue + 38) % 360;
   return `linear-gradient(135deg, hsl(${hue} 58% 40%), hsl(${hue2} 60% 28%))`;
 }
+
+/* ===================== ANIMATIONS (anime.js, optional) ===================== */
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const A = () => (window.anime && !REDUCED) ? window.anime : null;  // null = animate nothing
+let _introDone = false;
+
+// Reveal cards with a stagger as they scroll into view. Only on the first render
+// (so filtering/dev edits don't re-animate), and a no-op without anime.js.
+function animateOnView(container) {
+  const anime = A();
+  if (!anime || _introDone || !container) return;
+  const cards = [...container.querySelectorAll(".card")];
+  if (!cards.length) return;
+  cards.forEach(c => { c.style.opacity = "0"; });
+  const io = new IntersectionObserver((entries, obs) => {
+    const vis = entries.filter(e => e.isIntersecting).map(e => e.target);
+    if (!vis.length) return;
+    anime({
+      targets: vis, opacity: [0, 1], translateY: [26, 0], scale: [0.97, 1],
+      duration: 560, delay: anime.stagger(70), easing: "easeOutCubic",
+      complete: () => vis.forEach(t => { t.style.opacity = ""; t.style.transform = ""; })
+    });
+    vis.forEach(t => obs.unobserve(t));
+  }, { threshold: 0.08 });
+  cards.forEach(c => io.observe(c));
+}
+
+// One-time intro: hero pieces stagger in and the stat numbers count up.
+function introAnimation() {
+  const anime = A();
+  if (_introDone) { return; }
+  if (!anime) { _introDone = true; return; }
+  anime({
+    targets: "#hero-card > *", opacity: [0, 1], translateY: [16, 0],
+    delay: anime.stagger(90), duration: 650, easing: "easeOutCubic",
+    complete: () => document.querySelectorAll("#hero-card > *").forEach(t => { t.style.opacity = ""; t.style.transform = ""; })
+  });
+  document.querySelectorAll(".stat b").forEach(el => {
+    const target = parseInt((el.textContent || "0").replace(/[^0-9]/g, ""), 10) || 0;
+    if (target <= 0) return;
+    const obj = { v: 0 };
+    anime({ targets: obj, v: target, round: 1, duration: 1100, easing: "easeOutExpo", update: () => { el.textContent = obj.v; } });
+  });
+  _introDone = true;
+}
 function ownerTag(repo) {
   const o = ownerOf(repo);
   return o.toLowerCase() === CONFIG.username.toLowerCase() ? "" : `<span class="owner-tag" title="Owned by ${esc(o)}">${esc(o)}</span>`;
@@ -569,6 +616,8 @@ $("#theme-toggle").addEventListener("click", () => {
   themeMode = themeMode === "auto" ? "light" : themeMode === "light" ? "dark" : "auto";
   localStorage.setItem("theme", themeMode); applyTheme(themeMode);
   toast("Theme: " + themeMode);
+  const a = A();
+  if (a) a({ targets: "#theme-toggle", rotate: [0, 360], duration: 500, easing: "easeInOutQuad", complete: () => { $("#theme-toggle").style.transform = ""; } });
 });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themeMode === "auto") applyTheme("auto"); });
 
@@ -790,6 +839,7 @@ function renderFeatured() {
   sec.style.display = "";
   $("#featured-count").textContent = feats.length + (feats.length === 1 ? " project" : " projects");
   $("#featured-grid").innerHTML = feats.map(r => repoCard(r, true)).join("");
+  animateOnView($("#featured-grid"));
 }
 
 /* ===================== RENDER ALL ===================== */
@@ -826,6 +876,7 @@ function renderAll() {
   const grid = $("#repo-grid");
   if (!list.length) { grid.innerHTML = '<div class="state"><div class="big">No projects match.</div>Try clearing the search or filters.</div>'; return; }
   grid.innerHTML = list.map(r => repoCard(r, false)).join("");
+  animateOnView(grid);
 }
 
 /* ===================== POINTER GLOW ===================== */
@@ -1102,6 +1153,7 @@ async function boot() {
     REPOS = await gatherRepos();
     populateLangFilter();
     renderAllSections();
+    introAnimation();
   } catch (e) {
     $("#hero-card").innerHTML = `<div class="state"><div class="big">Couldn't load GitHub data</div>${
       String(e).includes("rate") ? "GitHub's hourly limit was hit — please try again shortly." :
