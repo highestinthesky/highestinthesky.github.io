@@ -9,51 +9,45 @@
 <link rel="preconnect" href="https://api.github.com" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&family=Tomorrow:wght@500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="tokens.css" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-<header class="nav">
-  <div class="wrap">
-    <a class="wordmark" href="#top"><span class="mark"></span><span id="brand-name">Portfolio</span></a>
-    <div class="nav-spacer"></div>
-    <button class="jump-pill" id="palette-open" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <span class="lbl">Jump to a project…</span>
-      <span class="kbd">⌘K</span>
-    </button>
-    <a class="icon-btn" id="gh-link" title="GitHub profile" target="_blank" rel="noopener" aria-label="GitHub profile">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.6 18 4.9 18 4.9c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
-    </a>
-  </div>
-</header>
+<button class="command-trigger" id="palette-open" type="button" aria-label="Open project command palette">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+  <span>⌘ K</span>
+</button>
 
 <a id="top"></a>
 
-<!-- ============ HERO — title-left, live code card right ============ -->
+<!-- ============ WORKBENCH — identity + repository topology ============ -->
 <section class="hero">
   <div class="wrap">
-    <div id="hero-text">
-      <div class="hero-id">
-        <div class="skel" style="width:56px;height:56px;border-radius:10px;flex:none"></div>
-        <div>
-          <div class="skel" style="height:22px;width:160px;margin-bottom:6px"></div>
-          <div class="skel" style="height:14px;width:100px"></div>
+    <div id="hero-text" class="hero-copy" aria-live="polite">
+      <div class="skel hero-skel-title"></div>
+      <div class="skel hero-skel-line"></div>
+    </div>
+    <figure class="system-map" aria-labelledby="map-caption">
+      <div class="map-head">
+        <span id="map-caption">Project map</span>
+        <span class="map-health"><span></span>live index</span>
+      </div>
+      <div class="topology" id="system-map">
+        <svg class="topology-links" id="topology-links" viewBox="0 0 1000 520" aria-hidden="true"></svg>
+        <div class="topology-core">
+          <span>index()</span>
+          <strong id="topology-total">—</strong>
         </div>
+        <div class="topology-nodes" id="topology-nodes" aria-label="Interactive project graph"></div>
+        <aside class="system-inspector" id="system-inspector" aria-live="polite">
+          <span class="inspector-kicker">Select a node</span>
+          <strong>Inspect the system</strong>
+        </aside>
       </div>
-      <div class="skel" style="height:16px;width:90%;margin-bottom:8px"></div>
-      <div class="skel" style="height:16px;width:70%"></div>
-    </div>
-    <div id="hero-code" class="code-card">
-      <div class="cc-bar">
-        <span class="cc-dots"><span></span><span></span><span></span></span>
-        <span class="cc-file">request.http</span>
-      </div>
-      <div class="cc-body">
-        <div class="cc-line">Loading…</div>
-      </div>
-    </div>
+      <div class="api-pulse" id="api-pulse"><span>GET</span> /users/:id/repos <b>pending</b></div>
+    </figure>
   </div>
 </section>
 
@@ -63,9 +57,8 @@
   <section class="section" id="rail-featured" data-rail="featured" style="display:none">
     <div class="wrap">
       <div class="section-head">
-        <h2>Featured &amp; live</h2>
+        <h2>Selected</h2>
         <span class="count" id="featured-count"></span>
-        <span class="rule"></span>
       </div>
       <div class="grid" id="featured-grid"></div>
     </div>
@@ -73,11 +66,8 @@
 
   <section class="section lang-band" id="rail-languages" data-rail="languages" style="display:none">
     <div class="wrap">
-      <div class="section-head">
-        <h2>By language</h2>
-        <span class="count" id="lang-count"></span>
-        <span class="rule"></span>
-      </div>
+      <h2 class="visually-hidden">Filter by language</h2>
+      <span class="visually-hidden" id="lang-count"></span>
       <div class="lang-chips" id="lang-chips"></div>
     </div>
   </section>
@@ -85,9 +75,8 @@
   <section class="section" id="rail-all" data-rail="all">
     <div class="wrap">
       <div class="section-head">
-        <h2>All projects</h2>
+        <h2>Index</h2>
         <span class="count" id="all-count"></span>
-        <span class="rule"></span>
       </div>
       <div class="controls">
         <label class="field search-field">
@@ -113,9 +102,8 @@
 
 <footer class="site-footer">
   <div class="wrap">
-    <span class="fmark"><span class="dot"></span> <span id="footer-name">Portfolio</span></span>
-    <span id="footer-text">Rebuilt on every visit from the GitHub API — no redeploy needed.</span>
-    <span class="fright">
+    <span class="fmark" id="footer-name">Portfolio</span>
+    <span class="fright" aria-label="Portfolio links">
       <a id="footer-gh" href="#" target="_blank" rel="noopener">Profile</a>
       <a id="footer-src" href="#" target="_blank" rel="noopener">Source</a>
     </span>
@@ -130,9 +118,6 @@
       <input type="text" id="palette-input" placeholder="Search projects or run a command…" autocomplete="off" />
     </div>
     <div class="palette-results" id="palette-results"></div>
-    <div class="palette-foot">
-      <span>↑↓ select</span><span>↵ open</span><span>esc close</span>
-    </div>
   </div>
 </dialog>
 

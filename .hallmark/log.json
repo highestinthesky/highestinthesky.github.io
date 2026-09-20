@@ -1,3 +1,5 @@
 [
+  { "date": "2026-09-20", "macrostructure": "Workbench", "theme": "Midnight", "enrichment": "E5 repository topology (Tier A, verified live data)", "brief": "highestinthesky · scalable mapped subset, 404-aware previews, source-first Index" },
+  { "date": "2026-09-20", "macrostructure": "Workbench", "theme": "Midnight", "enrichment": "E5 repository topology (Tier A, live data)", "brief": "highestinthesky · dark technical portfolio with live site and source previews" },
   { "date": "2026-09-16", "macrostructure": "Ecosystem Index", "theme": "Cobalt", "enrichment": "code-hero (Tier A, live API response)", "brief": "highestinthesky · GitHub portfolio redesign — modern-minimal/Cobalt, dropped glassmorphism + gradients" }
 ]
