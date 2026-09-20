@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-20",
+  "font_stack": "Tomorrow + IBM Plex Sans + IBM Plex Mono (Google Fonts, index.html)",
+  "palette": "OKLCH custom properties in tokens.css; dark-first Midnight palette with light command variant",
+  "motion": "Native CSS and browser APIs; no motion library",
+  "spacing": "Named 4-point CSS token scale",
+  "framework": "Vanilla HTML, CSS, and JavaScript",
+  "preserved": [
+    "GitHub API data loading",
+    "site editor and publishing workflow",
+    "project filtering, sorting, and command palette"
+  ]
+}

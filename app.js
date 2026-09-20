@@ -13,7 +13,7 @@ const CONFIG = {
   orgs: [],                          // e.g. ["my-team-org"] → pulls ALL public repos from each org
   extraRepos: ["Rohawklings/32863-ftc"],   // specific repos by "owner/name"
 
-  // Each card shows a real image (GitHub's auto-generated preview by default).
+  // Cards use a deployed site or a real source excerpt by default.
   // Hard-override any card here with your own image URL:
   images: {}        // e.g. { "my-repo": "https://example.com/screenshot.png" }
 };
@@ -23,6 +23,8 @@ const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const THEME_KEY = "portfolio-theme";
+document.documentElement.dataset.theme = localStorage.getItem(THEME_KEY) || "dark";
 let toastTimer;
 function toast(msg, action) {
   const t = $("#toast");
@@ -58,43 +60,19 @@ const ICONS = {
   twitter: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.2 2H21l-6.6 7.5L22 22h-6.2l-4.8-6.3L5.5 22H2.7l7-8L2 2h6.3l4.3 5.8L18.2 2Zm-1 18h1.6L7.2 3.7H5.4L17.2 20Z"/></svg>',
 };
 
-/* Deterministic per-repo solid monogram colour (a functional identicon, not decoration). */
-function repoMono(repo, size) {
-  const name = repo.name || "";
-  let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  const hue = h % 360;
-  const words = name.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(" ").filter(Boolean);
-  let ini = words.length >= 2 ? (words[0][0] + words[1][0]) : (words[0] || name).slice(0, 2);
-  ini = (ini || "?").toUpperCase();
-  return `<span class="repo-mono${size === "lg" ? " lg" : ""}" style="background:hsl(${hue} 46% 36%)">${esc(ini)}</span>`;
-}
 const ownerOf = (repo) => (repo.owner && repo.owner.login) || CONFIG.username;
 function ogImage(repo) {
   const cb = encodeURIComponent(repo.pushed_at || String(repo.id) || "1");
   return `https://opengraph.githubassets.com/${cb}/${ownerOf(repo)}/${repo.name}`;
 }
 const repoImage = (repo) => (CONFIG.images && CONFIG.images[repo.name]) || ogImage(repo);
-const ownerAvatar = (repo) => (repo.owner && repo.owner.avatar_url) || (PROFILE && PROFILE.avatar_url) || "";
 function ownerTag(repo) {
   const o = ownerOf(repo);
   return o.toLowerCase() === CONFIG.username.toLowerCase() ? "" : `<span class="owner-tag" title="Owned by ${esc(o)}">${esc(o)}</span>`;
 }
-const LANG_COLORS = { JavaScript:"#f1e05a", TypeScript:"#3178c6", Python:"#3572A5", HTML:"#e34c26", CSS:"#563d7c", Java:"#b07219", "C++":"#f34b7d", C:"#8a8a8a", "C#":"#178600", Go:"#00ADD8", Rust:"#dea584", Ruby:"#701516", PHP:"#4F5D95", Swift:"#F05138", Kotlin:"#A97BFF", Dart:"#00B4AB", Shell:"#89e051", Vue:"#41b883", Jupyter:"#DA5B0B", "Jupyter Notebook":"#DA5B0B", SCSS:"#c6538c", Lua:"#000080" };
-const langColor = (l) => LANG_COLORS[l] || "#9099a8";
 
-/* ===================== REVEAL (IntersectionObserver, one-shot) ===================== */
-const revealIO = REDUCED ? null : new IntersectionObserver((entries, obs) => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-in"); obs.unobserve(e.target); } });
-}, { threshold: 0.1 });
-function observeReveal(container) {
-  if (!container) return;
-  const items = [...container.children];
-  items.forEach((el, i) => {
-    el.classList.add("reveal");
-    el.style.transitionDelay = `${Math.min(i, 10) * 40}ms`;
-    if (revealIO) revealIO.observe(el); else el.classList.add("is-in");
-  });
-}
+/* Content arrives without scroll theatre; the live workbench carries the motion. */
+function observeReveal() {}
 
 /* ===================== STATE ===================== */
 let PROFILE = null;
@@ -172,7 +150,13 @@ async function gatherRepos() {
 
 /* ===================== PAGES URL ===================== */
 function pagesUrl(repo) {
-  if (repo.homepage && /^https?:\/\//.test(repo.homepage)) return repo.homepage;
+  if (repo.homepage && /^https?:\/\//.test(repo.homepage)) {
+    try {
+      const homepage = new URL(repo.homepage);
+      if (homepage.hostname.toLowerCase().endsWith(".github.io")) homepage.protocol = "https:";
+      return homepage.href;
+    } catch { return repo.homepage; }
+  }
   if (repo.has_pages) {
     const owner = (repo.owner && repo.owner.login) || CONFIG.username;
     if (repo.name.toLowerCase() === (owner + ".github.io").toLowerCase()) return `https://${owner}.github.io/`;
@@ -180,7 +164,47 @@ function pagesUrl(repo) {
   }
   return null;
 }
-const isLive = (repo) => !!pagesUrl(repo);
+const pageAvailability = new Map();
+
+function isGithubPagesUrl(url) {
+  try { return new URL(url).hostname.toLowerCase().endsWith(".github.io"); }
+  catch { return false; }
+}
+
+function liveUrl(repo) {
+  const url = pagesUrl(repo);
+  return url && pageAvailability.get(url) !== false ? url : null;
+}
+
+function isPage404(repo) {
+  const url = pagesUrl(repo);
+  return !!url && pageAvailability.get(url) === false;
+}
+
+async function validateGithubPages(repos) {
+  const urls = [...new Set(repos.map(pagesUrl).filter(url => url && isGithubPagesUrl(url)))];
+  await Promise.allSettled(urls.map(async url => {
+    const key = `pagecheck:${url}`;
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem(key)); } catch {}
+    if (cached && Date.now() - cached.t < CONFIG.cacheMinutes * 60000) {
+      pageAvailability.set(url, cached.ok);
+      return;
+    }
+    try {
+      const response = await fetch(url, { method: "HEAD", cache: "no-store", redirect: "follow" });
+      if (response.ok || response.status === 404) {
+        const ok = response.ok;
+        pageAvailability.set(url, ok);
+        try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), ok })); } catch {}
+      }
+    } catch {
+      /* A transient network or CORS failure is not evidence that a live page is gone. */
+    }
+  }));
+}
+
+const isLive = (repo) => !!liveUrl(repo);
 
 /* ===================== ACCENT ===================== */
 function applyAccent() {
@@ -192,139 +216,297 @@ function applyAccent() {
   }
 }
 
-/* ===================== HERO ===================== */
-function countUp(el, target, duration = 1100) {
-  if (REDUCED || !target) { el.textContent = target; return; }
-  const t0 = performance.now();
-  function tick(now) {
-    const p = Math.min(1, (now - t0) / duration);
-    const eased = 1 - Math.pow(1 - p, 3);
-    el.textContent = Math.round(eased * target);
-    if (p < 1) requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
-}
-async function typeIn(el, delay = 150) {
-  if (REDUCED) return; // already fully rendered; reduced motion skips the reveal animation
-  try { await document.fonts.ready; } catch {}
-  // Measure the real rendered width (post font-swap) rather than trusting a
-  // percentage/ch target, which can go stale if the mono font loads late.
-  const probe = el.cloneNode(true);
-  probe.style.cssText = "position:absolute; visibility:hidden; white-space:nowrap; width:auto; left:-9999px;";
-  el.parentElement.appendChild(probe);
-  const natural = probe.scrollWidth;
-  probe.remove();
-  el.style.setProperty("--chars", el.textContent.length);
-  el.style.setProperty("--type-w", natural + "px");
-  el.classList.add("cc-typewriter");
-  el.style.animationDelay = delay + "ms";
-}
-
+/* ===================== HERO / LIVE REPOSITORY TOPOLOGY ===================== */
 function renderHero() {
   const p = PROFILE;
   const name = OVERRIDES.name || p.name || p.login;
   const bio  = OVERRIDES.tagline || p.bio || "";
-  $("#brand-name").textContent = name;
   $("#footer-name").textContent = name;
   document.title = name + " · Portfolio";
-  $("#gh-link").href = p.html_url;
   $("#footer-gh").href = p.html_url;
   $("#footer-src").href = `https://github.com/${CONFIG.repo || (CONFIG.username + "/" + CONFIG.username + ".github.io")}`;
-  const totalStars = REPOS.reduce((s, r) => s + (r.stargazers_count || 0), 0);
-  const liveCount = REPOS.filter(isLive).length;
-
-  const social = (href, label, svg) => href ? `<a class="social" href="${esc(href)}" target="_blank" rel="noopener">${svg}${esc(label)}</a>` : "";
   const blog = p.blog ? (/^https?:\/\//.test(p.blog) ? p.blog : "https://" + p.blog) : "";
 
   $("#hero-text").innerHTML = `
-    <div class="hero-id">
-      <img class="avatar" src="${esc(p.avatar_url)}" alt="${esc(name)}" width="56" height="56" />
-      <div>
-        <div class="hero-name">${esc(name)}</div>
-        <div class="hero-handle">@${esc(p.login)}</div>
-      </div>
-    </div>
+    <span class="hero-handle">@${esc(p.login)}</span>
+    <h1 class="hero-name">${esc(name)}</h1>
     ${bio ? `<p class="hero-bio">${esc(bio)}</p>` : ""}
-    <div class="hero-meta">
-      ${p.location ? `<span>${ICONS.pin}${esc(p.location)}</span>` : ""}
-      ${p.company ? `<span>${ICONS.building}${esc(p.company)}</span>` : ""}
-      ${blog ? `<span>${ICONS.link}<a href="${esc(blog)}" target="_blank" rel="noopener">${esc(p.blog)}</a></span>` : ""}
-    </div>
-    <div class="socials">
-      <a class="social" href="${esc(p.html_url)}" target="_blank" rel="noopener">${ICONS.github}GitHub</a>
-      ${social(p.twitter_username ? "https://twitter.com/" + p.twitter_username : "", "Twitter / X", ICONS.twitter)}
-      ${social(blog, "Website", ICONS.link)}
+    <div class="hero-links">
+      <a class="hero-link" href="${esc(p.html_url)}" target="_blank" rel="noopener">${ICONS.github}GitHub</a>
+      ${blog ? `<a class="hero-link" href="${esc(blog)}" target="_blank" rel="noopener">${ICONS.external}Website</a>` : ""}
     </div>`;
 
-  $("#hero-code").innerHTML = `
-    <div class="cc-bar">
-      <span class="cc-dots"><span></span><span></span><span></span></span>
-      <span class="cc-file">request.http</span>
-      <span class="cc-status">200 OK</span>
-    </div>
-    <div class="cc-body">
-      <div class="cc-line" id="cc-typeline"><span class="cc-method">GET</span> api.github.com/users/${esc(CONFIG.username)}</div>
-      <div class="cc-json" id="cc-json" style="${REDUCED ? "" : "opacity:0"}">
-<span class="p">{</span>
-  <span class="k">"public_repos"</span><span class="p">:</span> <span class="v" id="cc-repos">0</span><span class="p">,</span>
-  <span class="k">"followers"</span><span class="p">:</span> <span class="v" id="cc-followers">0</span><span class="p">,</span>
-  <span class="k">"stars_earned"</span><span class="p">:</span> <span class="v" id="cc-stars">0</span><span class="p">,</span>
-  <span class="k">"pages_live"</span><span class="p">:</span> <span class="v" id="cc-live">0</span>
-<span class="p">}</span></div>
-    </div>`;
-
-  const line = $("#cc-typeline");
-  typeIn(line, 150);
-
-  const reveal = () => {
-    const j = $("#cc-json");
-    j.style.transition = `opacity 300ms var(--ease-out)`;
-    j.style.opacity = 1;
-    countUp($("#cc-repos"), p.public_repos);
-    countUp($("#cc-followers"), p.followers);
-    countUp($("#cc-stars"), totalStars);
-    countUp($("#cc-live"), liveCount);
-  };
-  if (REDUCED) reveal();
-  else line.addEventListener("animationend", reveal, { once: true });
+  renderSystemMap();
 }
 
-/* ===================== CARD TEMPLATE ===================== */
-function repoCard(repo) {
-  const live = pagesUrl(repo);
-  const topics = (repo.topics || []).slice(0, 4);
-  const customImg = (CONFIG.images && CONFIG.images[repo.name]) || "";
-  const avatar = ownerAvatar(repo);
-  return `
-  <article class="card" data-card data-name="${esc(repo.name)}" tabindex="0" role="button" aria-label="Preview ${esc(repo.name)}">
-    <div class="card-banner">
-      ${repoMono(repo, "lg")}
-      ${customImg
-        ? `<img class="banner-cover" src="${esc(customImg)}" alt="" loading="lazy" onerror="this.remove()" />`
-        : (avatar ? `<img class="banner-avatar" src="${esc(avatar)}" alt="" loading="lazy" onerror="this.remove()" />` : "")}
-      <span class="hint">${ICONS.external}preview</span>
+function topologySelection(repo) {
+  $$(".topology-node", $("#topology-nodes")).forEach(node => {
+    node.setAttribute("aria-pressed", String(node.dataset.name === repo.name));
+  });
+  const live = liveUrl(repo);
+  const updated = new Date(repo.pushed_at).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  $("#system-inspector").innerHTML = `
+    <span class="inspector-kicker">${esc(repo.language || "Repository")} · ${esc(updated)}</span>
+    <strong>${esc(repo.name)}</strong>
+    <div class="inspector-actions">
+      ${live ? `<a class="btn primary" href="${esc(live)}" target="_blank" rel="noopener">Live</a>` : ""}
+      <a class="btn" href="${esc(repo.html_url)}" target="_blank" rel="noopener">Source</a>
     </div>
+    ${repo.description ? `<p>${esc(repo.description)}</p>` : ""}`;
+}
+
+function renderSystemMap() {
+  const list = [...visibleRepos()].sort((a, b) => {
+    const featuredDelta = Number(isFeatured(b)) - Number(isFeatured(a));
+    const liveDelta = Number(isLive(b)) - Number(isLive(a));
+    return featuredDelta || liveDelta || (new Date(b.pushed_at) - new Date(a.pushed_at));
+  });
+  const compact = matchMedia("(max-width: 39.99rem)").matches;
+  const positions = compact
+    ? [[25, 14], [75, 14], [25, 56], [75, 56]]
+    : [[15, 15], [42, 11], [76, 16], [87, 37], [80, 61], [57, 61], [25, 63], [12, 40]];
+  const projects = list.slice(0, positions.length);
+  const core = compact ? [50, 36] : [50, 43];
+  const nodes = $("#topology-nodes");
+  const links = $("#topology-links");
+  links.setAttribute("preserveAspectRatio", "none");
+  $("#topology-total").textContent = String(list.length);
+  $(".map-health").innerHTML = `<span></span>${projects.length}/${list.length} mapped`;
+  nodes.setAttribute("aria-label", `Showing ${projects.length} of ${list.length} projects. The full set is in the Index.`);
+
+  if (!projects.length) {
+    nodes.innerHTML = "";
+    links.innerHTML = "";
+    $("#system-inspector").innerHTML = '<span class="inspector-kicker">No public repositories</span><strong>The index is empty.</strong>';
+    return;
+  }
+
+  nodes.innerHTML = projects.map((repo, index) => {
+    const [x, y] = positions[index];
+    return `<button class="topology-node" type="button" data-name="${esc(repo.name)}"
+      aria-pressed="false" aria-label="Inspect ${esc(repo.name)}"
+      style="--node-x:${x}%;--node-y:${y}%">
+      <strong>${esc(repo.name)}</strong>
+      <span>${esc(repo.language || (isLive(repo) ? "deployed" : "source"))}</span>
+    </button>`;
+  }).join("");
+
+  links.innerHTML = projects.map((repo, index) => {
+    const [x, y] = positions[index];
+    return `<line class="${isLive(repo) ? "is-live" : ""}" x1="${core[0] * 10}" y1="${core[1] * 5.2}" x2="${x * 10}" y2="${y * 5.2}" />`;
+  }).join("") + `<circle cx="${core[0] * 10}" cy="${core[1] * 5.2}" r="4" />`;
+
+  $$(".topology-node", nodes).forEach(node => node.addEventListener("click", () => {
+    const repo = projects.find(item => item.name === node.dataset.name);
+    if (repo) topologySelection(repo);
+  }));
+  topologySelection(projects[0]);
+
+  const languages = new Set(REPOS.map(repo => repo.language).filter(Boolean)).size;
+  const liveCount = REPOS.filter(isLive).length;
+  $("#api-pulse").innerHTML = `<span>GET</span> /users/${esc(CONFIG.username)}/repos <b>200 · ${languages} languages · ${liveCount} live</b>`;
+}
+
+matchMedia("(max-width: 39.99rem)").addEventListener("change", () => {
+  if (REPOS.length) renderSystemMap();
+});
+
+/* ===================== CARD TEMPLATE ===================== */
+function codePreviewMarkup(repo) {
+  return `<div class="project-media">
+    <div class="code-preview" data-code-preview data-state="idle"
+      data-owner="${esc(ownerOf(repo))}" data-repo="${esc(repo.name)}" data-branch="${esc(repo.default_branch || "main")}">
+      <div class="code-preview__path">resolving source…</div>
+      <pre aria-label="Source preview for ${esc(repo.name)}"><code>
+        <span class="code-line" data-line="1"><span>Fetching a real source excerpt.</span></span>
+        <span class="code-line" data-line="2"><span>No generated sample code.</span></span>
+      </code></pre>
+    </div>
+  </div>`;
+}
+
+function projectMedia(repo, mode = "auto") {
+  if (mode === "code" || isPage404(repo)) return codePreviewMarkup(repo);
+  const customImage = (CONFIG.images && CONFIG.images[repo.name]) || "";
+  if (customImage) {
+    return `<div class="project-media"><img class="repo-image" src="${esc(customImage)}" alt="${esc(repo.name)} project preview" loading="lazy" /></div>`;
+  }
+  const live = liveUrl(repo);
+  const portfolioRepo = (CONFIG.repo || `${CONFIG.username}/${CONFIG.username}.github.io`).split("/").pop().toLowerCase();
+  if (ownerOf(repo).toLowerCase() === CONFIG.username.toLowerCase() && repo.name.toLowerCase() === portfolioRepo) {
+    return codePreviewMarkup(repo);
+  }
+  if (!live) return codePreviewMarkup(repo);
+  let host = live;
+  try { host = new URL(live).hostname; } catch {}
+  return `<div class="project-media site-preview">
+    <div class="site-preview__fallback"><strong>${esc(repo.name)}</strong><span>${esc(host)}</span></div>
+    <iframe data-live-src="${esc(live)}" data-live-key="${esc(ownerOf(repo) + "/" + repo.name)}"
+      title="Live preview of ${esc(repo.name)}" loading="lazy"
+      referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
+  </div>`;
+}
+
+function repoCard(repo, { mediaMode = "auto" } = {}) {
+  const live = liveUrl(repo);
+  let updated = "";
+  try { updated = new Date(repo.pushed_at).toLocaleDateString(undefined, { month: "short", year: "numeric" }); } catch {}
+  return `
+  <article class="card" data-card data-name="${esc(repo.name)}">
+    ${projectMedia(repo, mediaMode)}
     <div class="card-body">
       <div class="top">
         <div class="repo-name">
-          <span class="rn-text">${esc(repo.name)}</span>
+          <button class="repo-title" type="button" data-preview-project="${esc(repo.name)}">${esc(repo.name)}</button>
           ${ownerTag(repo)}
         </div>
         ${live ? '<span class="badge live">Live</span>' : repo.fork ? '<span class="badge fork">Fork</span>' : repo.archived ? '<span class="badge archived">Archived</span>' : ""}
       </div>
-      <p class="desc">${esc(repo.description || "No description provided.")}</p>
-      ${topics.length ? `<div class="topics">${topics.map(t => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
+      ${repo.description ? `<p class="desc">${esc(repo.description)}</p>` : ""}
       <div class="card-foot">
-        ${repo.language ? `<span class="lang"><span class="lang-dot" style="background:${langColor(repo.language)}"></span>${esc(repo.language)}</span>` : ""}
-        ${repo.stargazers_count ? `<span>${repo.stargazers_count} ★</span>` : ""}
-        ${repo.forks_count ? `<span>${repo.forks_count} ⑂</span>` : ""}
+        ${repo.language ? `<span class="lang"><span class="lang-dot"></span>${esc(repo.language)}</span>` : ""}
+        ${updated ? `<span>${esc(updated)}</span>` : ""}
       </div>
       <div class="card-actions">
-        ${live ? `<a class="btn primary" href="${esc(live)}" target="_blank" rel="noopener">${ICONS.external}View live</a>` : ""}
-        <a class="btn" href="${esc(repo.html_url)}" target="_blank" rel="noopener">${ICONS.github}Code</a>
+        ${live ? `<a class="btn primary" href="${esc(live)}" target="_blank" rel="noopener">${ICONS.external}Live</a>` : ""}
+        <a class="btn" href="${esc(repo.html_url)}" target="_blank" rel="noopener">${ICONS.github}Source</a>
       </div>
     </div>
   </article>`;
+}
+
+const SOURCE_EXTENSIONS = /\.(?:html?|css|scss|js|jsx|mjs|ts|tsx|py|rb|php|go|rs|java|kt|kts|swift|c|cc|cpp|h|hpp|cs|vue|svelte)$/i;
+const SOURCE_EXCLUDES = /(^|\/)(?:dist|build|vendor|node_modules|coverage|\.next|docs?\/generated)(\/|$)|(?:\.min\.|package-lock|yarn\.lock|pnpm-lock)/i;
+const sourceCache = new Map();
+const loadedLivePreviews = new Set();
+const codePreviewObserver = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    codePreviewObserver.unobserve(entry.target);
+    loadCodePreview(entry.target);
+  });
+}, { rootMargin: "220px" });
+const livePreviewObserver = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const frame = entry.target;
+    livePreviewObserver.unobserve(frame);
+    const key = frame.dataset.liveKey;
+    if (loadedLivePreviews.has(key)) {
+      frame.remove();
+      return;
+    }
+    loadedLivePreviews.add(key);
+    frame.src = frame.dataset.liveSrc;
+  });
+}, { rootMargin: "180px" });
+
+// Below this, a file is almost always a near-empty stub (e.g. SvelteKit's
+// placeholder `$lib/index.js`) rather than anything worth previewing.
+const MIN_SOURCE_BYTES = 200;
+
+function scoreSourceFile(file) {
+  if (file.type !== "blob" || !SOURCE_EXTENSIONS.test(file.path) || SOURCE_EXCLUDES.test(file.path)) return -1;
+  if (!file.size || file.size < MIN_SOURCE_BYTES) return -1;
+  let score = 0;
+  if (/(^|\/)(?:src|app|lib)\//i.test(file.path)) score += 12;
+  if (/(^|\/)(?:index|main|app)\.[^.]+$/i.test(file.path)) score += 18;
+  if (/\.(?:ts|tsx|js|jsx|py|swift|rs|go)$/i.test(file.path)) score += 8;
+  score -= file.path.split("/").length;
+  if (file.size > 80000) score -= 20;
+  return score;
+}
+
+const LEADING_COMMENT = /^(?:\/\/|#|<!--)/;
+
+function sourceLines(text) {
+  const lines = text.replace(/\r/g, "").split("\n");
+  let start = 0;
+  let inBlockComment = false;
+  while (start < lines.length) {
+    const trimmed = lines[start].trim();
+    if (!trimmed) { start++; continue; }
+    if (inBlockComment) {
+      if (trimmed.includes("*/")) inBlockComment = false;
+      start++;
+      continue;
+    }
+    if (trimmed.startsWith("/*")) { inBlockComment = !trimmed.includes("*/"); start++; continue; }
+    if (LEADING_COMMENT.test(trimmed)) { start++; continue; }
+    break;
+  }
+  // A file that's nothing but a header comment (e.g. a license banner) falls
+  // back to showing that header rather than an empty excerpt.
+  if (start >= lines.length) {
+    start = lines.findIndex(line => line.trim());
+    if (start < 0) start = 0;
+  }
+  return lines.slice(start, start + 12).map(line => line.replace(/\t/g, "  ").slice(0, 120));
+}
+
+function renderSourcePreview(el, path, lines) {
+  el.dataset.state = "success";
+  $(".code-preview__path", el).textContent = path;
+  $("code", el).innerHTML = lines.map((line, index) => {
+    const accent = index === 0 && /\b(?:import|export|class|function|const|def|struct|package)\b/.test(line);
+    return `<span class="code-line${accent ? " is-accent" : ""}" data-line="${index + 1}"><span>${esc(line || " ")}</span></span>`;
+  }).join("");
+}
+
+function renderRepositoryMetadata(el, repoName, branch) {
+  el.dataset.state = "error";
+  renderSourcePreview(el, "repository.metadata", [
+    `repository: ${repoName}`,
+    `default_branch: ${branch}`,
+    "source_preview: unavailable",
+  ]);
+  el.dataset.state = "error";
+}
+
+async function fetchSourcePreview(owner, repoName, branch) {
+  const key = `${owner}/${repoName}@${branch}`;
+  if (sourceCache.has(key)) return sourceCache.get(key);
+  const pending = (async () => {
+    const tree = await cachedJSON(
+      `https://api.github.com/repos/${owner}/${repoName}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+      `tree:${key}`
+    );
+    const candidates = (tree.tree || []).map(file => ({ file, score: scoreSourceFile(file) }))
+      .filter(item => item.score >= 0)
+      .sort((a, b) => b.score - a.score);
+    if (!candidates.length) throw new Error("no-source-file");
+    const path = candidates[0].file.path;
+    const safePath = path.split("/").map(encodeURIComponent).join("/");
+    const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repoName}/${encodeURIComponent(branch)}/${safePath}`);
+    if (!response.ok) throw new Error("source-fetch-failed");
+    return { path, lines: sourceLines(await response.text()) };
+  })();
+  sourceCache.set(key, pending);
+  try { return await pending; }
+  catch (error) { sourceCache.delete(key); throw error; }
+}
+
+async function loadCodePreview(el) {
+  if (!el || el.dataset.state !== "idle") return;
+  const owner = el.dataset.owner;
+  const repoName = el.dataset.repo;
+  const branch = el.dataset.branch;
+  el.dataset.state = "loading";
+  try {
+    const source = await fetchSourcePreview(owner, repoName, branch);
+    renderSourcePreview(el, source.path, source.lines);
+  } catch {
+    renderRepositoryMetadata(el, repoName, branch);
+  }
+}
+
+function hydrateCodePreviews(scope) {
+  $$("[data-code-preview]", scope || document).forEach(el => codePreviewObserver.observe(el));
+}
+
+function hydrateProjectMedia(scope) {
+  hydrateCodePreviews(scope);
+  $$("iframe[data-live-src]", scope || document).forEach(frame => livePreviewObserver.observe(frame));
 }
 
 /* ===================== VISIBLE / FEATURED LOGIC ===================== */
@@ -364,6 +546,7 @@ function renderFeatured() {
   if ((OVERRIDES.sections || []).includes("featured")) sec.style.display = "";
   $("#featured-count").textContent = feats.length + (feats.length === 1 ? " project" : " projects");
   $("#featured-grid").innerHTML = feats.map(r => repoCard(r)).join("");
+  hydrateProjectMedia($("#featured-grid"));
   observeReveal($("#featured-grid"));
 }
 
@@ -379,7 +562,7 @@ function renderLanguages() {
   $("#lang-count").textContent = langs.length + (langs.length === 1 ? " language" : " languages");
   $("#lang-chips").innerHTML = langs.map(([lang, n]) => `
     <button class="lang-chip" type="button" data-lang="${esc(lang)}">
-      <span class="lang-dot" style="background:${langColor(lang)}"></span>${esc(lang)}<span class="n">${n}</span>
+      <span class="lang-dot"></span>${esc(lang)}<span class="n">${n}</span>
     </button>`).join("");
   $$(".lang-chip", $("#lang-chips")).forEach(chip => chip.addEventListener("click", () => {
     const lang = chip.dataset.lang;
@@ -424,7 +607,8 @@ function renderAll() {
   $("#all-count").textContent = list.length + (list.length === 1 ? " project" : " projects");
   const grid = $("#repo-grid");
   if (!list.length) { grid.innerHTML = '<div class="state"><div class="big">No projects match.</div>Try clearing the filter or search.</div>'; return; }
-  grid.innerHTML = list.map(r => repoCard(r)).join("");
+  grid.innerHTML = list.map(r => repoCard(r, { mediaMode: "code" })).join("");
+  hydrateProjectMedia(grid);
   observeReveal(grid);
 }
 
@@ -721,8 +905,17 @@ $("#editor-publish").addEventListener("click", async () => {
 
 /* ===================== COMMAND PALETTE ===================== */
 let paletteItems = [], paletteIndex = 0;
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem(THEME_KEY, next);
+}
 function paletteActions() {
-  const acts = [{ type: "action", label: "Open GitHub profile", run: () => window.open(PROFILE.html_url, "_blank", "noopener") }];
+  const nextTheme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  const acts = [
+    { type: "action", label: `Use ${nextTheme} mode`, run: toggleTheme },
+    { type: "action", label: "Open GitHub profile", run: () => window.open(PROFILE.html_url, "_blank", "noopener") },
+  ];
   if (isDevMode()) acts.push({ type: "action", label: "Open site editor", run: () => { $("#editor").showModal(); buildEditor(); } });
   return acts;
 }
@@ -744,7 +937,6 @@ function renderPalette() {
     html += '<div class="palette-group-label">Projects</div>';
     html += projects.map((it, i) => `
       <div class="palette-row" role="option" aria-selected="${i === paletteIndex}" data-i="${i}">
-        ${repoMono(it.repo)}
         <span class="pr-name">${esc(it.repo.name)}</span>
         <span class="pr-lang">${esc(it.repo.language || "")}</span>
       </div>`).join("");
@@ -795,20 +987,9 @@ document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); }
 });
 
-/* ===================== POINTER GLOW (subtle card border light) ===================== */
-document.addEventListener("pointermove", (e) => {
-  const c = e.target.closest("[data-card]"); if (!c) return;
-  const r = c.getBoundingClientRect();
-  c.style.setProperty("--mx", (e.clientX - r.left) + "px");
-  c.style.setProperty("--my", (e.clientY - r.top) + "px");
-});
-
 /* ===================== REPO PREVIEW ===================== */
 function openPreview(repo) {
-  const live = pagesUrl(repo);
-  const owner = ownerOf(repo);
-  const cb = encodeURIComponent(repo.pushed_at || String(repo.id) || "1");
-  const og = `https://opengraph.githubassets.com/${cb}/${owner}/${repo.name}`;
+  const live = liveUrl(repo);
   const topics = (repo.topics || []).map(t => `<span class="topic">${esc(t)}</span>`).join("");
   let updated = "";
   try { updated = new Date(repo.pushed_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); } catch {}
@@ -817,56 +998,50 @@ function openPreview(repo) {
     ? `<div class="pv-frame">
          <div class="pv-loading">Loading live preview…</div>
          <iframe src="${esc(live)}" loading="lazy" referrerpolicy="no-referrer"
-           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+           sandbox="allow-scripts allow-same-origin"
            onload="this.previousElementSibling.style.display='none'"></iframe>
        </div>`
-    : `<div class="pv-frame static"><img src="${esc(og)}" alt="${esc(repo.name)} preview" loading="lazy"
-         onerror="this.closest('.pv-frame').style.display='none'" /></div>`;
+    : `<div class="pv-frame static">${codePreviewMarkup(repo)}</div>`;
 
   $("#preview-content").innerHTML = `
     <button class="icon-btn dlg-close" id="preview-close" aria-label="Close preview">${ICONS.x}</button>
     <div class="pv-head">
-      ${repoMono(repo, "lg")}
       <div>
         <h3>${esc(repo.name)}</h3>
         <div class="pv-sub">
           ${live ? '<span class="badge live">Live</span>' : repo.fork ? '<span class="badge fork">Fork</span>' : ""}
           ${ownerTag(repo)}
-          ${repo.language ? `<span class="lang"><span class="lang-dot" style="background:${langColor(repo.language)}"></span>${esc(repo.language)}</span>` : ""}
+          ${repo.language ? `<span class="lang"><span class="lang-dot"></span>${esc(repo.language)}</span>` : ""}
           ${updated ? `<span>updated ${updated}</span>` : ""}
         </div>
       </div>
     </div>
     ${previewBlock}
-    <p class="pv-desc">${esc(repo.description || "No description provided.")}</p>
+    ${repo.description ? `<p class="pv-desc">${esc(repo.description)}</p>` : ""}
     ${topics ? `<div class="topics" style="margin-bottom:var(--space-md)">${topics}</div>` : ""}
-    <div class="pv-stats">${repo.stargazers_count} ★ &nbsp;·&nbsp; ${repo.forks_count} ⑂${repo.open_issues_count ? ` &nbsp;·&nbsp; ${repo.open_issues_count} open issues` : ""}</div>
     <div class="pv-actions">
-      ${live ? `<a class="btn primary" href="${esc(live)}" target="_blank" rel="noopener">${ICONS.external}Open live</a>` : ""}
-      <a class="btn" href="${esc(repo.html_url)}" target="_blank" rel="noopener">${ICONS.github}View code on GitHub</a>
+      ${live ? `<a class="btn primary" href="${esc(live)}" target="_blank" rel="noopener">${ICONS.external}Live</a>` : ""}
+      <a class="btn" href="${esc(repo.html_url)}" target="_blank" rel="noopener">${ICONS.github}Source</a>
     </div>`;
   $("#preview-close").addEventListener("click", () => $("#preview").close());
   $("#preview").showModal();
+  hydrateCodePreviews($("#preview-content"));
 }
 $("#preview").addEventListener("click", (e) => { if (e.target === $("#preview")) $("#preview").close(); });
 $("#preview").addEventListener("close", () => { $("#preview-content").innerHTML = ""; });
 
 document.addEventListener("click", (e) => {
+  const previewButton = e.target.closest("[data-preview-project]");
+  if (previewButton) {
+    const repo = REPOS.find(r => r.name === previewButton.dataset.previewProject);
+    if (repo) openPreview(repo);
+    return;
+  }
   const card = e.target.closest("[data-card]");
   if (!card) return;
   if (e.target.closest("a, button, .btn")) return;
   const repo = REPOS.find(r => r.name === card.dataset.name);
   if (repo) openPreview(repo);
-});
-document.addEventListener("keydown", (e) => {
-  if ((e.key === "Enter" || e.key === " ")) {
-    const c = document.activeElement;
-    if (c && c.matches && c.matches("[data-card]")) {
-      e.preventDefault();
-      const repo = REPOS.find(r => r.name === c.dataset.name);
-      if (repo) openPreview(repo);
-    }
-  }
 });
 
 /* ===================== WIRE UP CONTROLS ===================== */
@@ -893,6 +1068,7 @@ async function boot() {
   try {
     PROFILE = await cachedJSON(`https://api.github.com/users/${CONFIG.username}`, "user:" + CONFIG.username);
     REPOS = await gatherRepos();
+    await validateGithubPages(REPOS);
     populateLangFilter();
     renderAllSections();
   } catch (e) {
