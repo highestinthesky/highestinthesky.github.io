@@ -8,8 +8,18 @@
     "wordlebot"
   ],
   "order": [
-    "highestinthesky.github.io",
+    "frc-scouting-app",
     "password-manager",
-    "frc-scouting-app"
+    "highestinthesky.github.io",
+    "algorithm-visualizer",
+    "word-games",
+    "rohawks-centerpiece",
+    "32863-ftc",
+    "myTime",
+    "website-centerpieces",
+    "c19-data",
+    "videogame_revenue_raw",
+    "hazoc",
+    "wordlebot"
   ]
 }
