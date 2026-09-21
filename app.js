@@ -1,24 +1,14 @@
-/* =====================================================================
-   CONFIG — set your GitHub username here (the only required edit).
-   ===================================================================== */
 const CONFIG = {
-  username: "highestinthesky",   //  <-- your GitHub handle
-  repo: null,              // "owner/name" to publish to; defaults to `${username}.github.io`
-  hideForks: false,        // show forked repos by default (toggle still available)
-  hideArchived: false,     // hide archived repos
-  cacheMinutes: 10,        // cache API results to respect GitHub rate limits
-
-  // Show PUBLIC repos that live in organizations too (private repos can't be
-  // shown on a static site — that would require a token).
-  orgs: [],                          // e.g. ["my-team-org"] → pulls ALL public repos from each org
-  extraRepos: ["Rohawklings/32863-ftc"],   // specific repos by "owner/name"
-
-  // Cards use a deployed site or a real source excerpt by default.
-  // Hard-override any card here with your own image URL:
-  images: {}        // e.g. { "my-repo": "https://example.com/screenshot.png" }
+  username: "highestinthesky", 
+  repo: null,           
+  hideForks: false,
+  hideArchived: false,
+  cacheMinutes: 10,  
+  orgs: [],                        
+  extraRepos: ["Rohawklings/32863-ftc"],  
+  images: {}        // e.g. { "repo": "https://example.com/screenshot.png" }
 };
 
-/* ----- small helpers ----- */
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
