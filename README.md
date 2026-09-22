@@ -23,6 +23,7 @@ Open `app.js` and change the top of the `CONFIG` object:
 ```js
 const CONFIG = {
   username: "YOUR_GITHUB_USERNAME",   //  <-- your GitHub handle
+  email: "you@example.com",  // shown in the hero as a mailto: link
   repo: null,               // "owner/name" to publish to — defaults to `${username}.github.io`
   hideForks: false,
   hideArchived: false,

@@ -1,13 +1,20 @@
 const CONFIG = {
-  username: "highestinthesky", 
-  repo: null,           
+  username: "highestinthesky",
+  email: "yaseru2003@gmail.com",
+  repo: null,
   hideForks: false,
   hideArchived: false,
-  cacheMinutes: 10,  
-  orgs: [],                        
-  extraRepos: ["Rohawklings/32863-ftc"],  
+  cacheMinutes: 10,
+  orgs: [],
+  extraRepos: ["Rohawklings/32863-ftc"],
   images: {}        // e.g. { "repo": "https://example.com/screenshot.png" }
 };
+
+/* Loads take a moment (live API calls), so the browser's own scroll
+   restoration can land a reload halfway down a page that's since
+   reflowed — always start fresh at the top instead. */
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+window.scrollTo(0, 0);
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -48,6 +55,9 @@ const ICONS = {
   star2: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8l-6.2 3.2L7 14.2l-5-4.9 6.9-1Z"/></svg>',
   github: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.6 18 4.9 18 4.9c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>',
   twitter: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.2 2H21l-6.6 7.5L22 22h-6.2l-4.8-6.3L5.5 22H2.7l7-8L2 2h6.3l4.3 5.8L18.2 2Zm-1 18h1.6L7.2 3.7H5.4L17.2 20Z"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3.5 6.5 8.5 7 8.5-7"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.2a8.5 8.5 0 1 1-9.7-11.7 7 7 0 0 0 9.7 11.7Z"/></svg>',
 };
 
 const ownerOf = (repo) => (repo.owner && repo.owner.login) || CONFIG.username;
@@ -215,7 +225,6 @@ function renderHero() {
   document.title = name + " · Portfolio";
   $("#footer-gh").href = p.html_url;
   $("#footer-src").href = `https://github.com/${CONFIG.repo || (CONFIG.username + "/" + CONFIG.username + ".github.io")}`;
-  const blog = p.blog ? (/^https?:\/\//.test(p.blog) ? p.blog : "https://" + p.blog) : "";
 
   $("#hero-text").innerHTML = `
     <span class="hero-handle">@${esc(p.login)}</span>
@@ -223,7 +232,7 @@ function renderHero() {
     ${bio ? `<p class="hero-bio">${esc(bio)}</p>` : ""}
     <div class="hero-links">
       <a class="hero-link" href="${esc(p.html_url)}" target="_blank" rel="noopener">${ICONS.github}GitHub</a>
-      ${blog ? `<a class="hero-link" href="${esc(blog)}" target="_blank" rel="noopener">${ICONS.external}Website</a>` : ""}
+      ${CONFIG.email ? `<a class="hero-link" href="mailto:${esc(CONFIG.email)}">${ICONS.mail}Email</a>` : ""}
     </div>`;
 
   renderSystemMap();
@@ -332,7 +341,7 @@ function projectMedia(repo, mode = "auto") {
   return `<div class="project-media site-preview">
     <div class="site-preview__fallback"><strong>${esc(repo.name)}</strong><span>${esc(host)}</span></div>
     <iframe data-live-src="${esc(live)}" data-live-key="${esc(ownerOf(repo) + "/" + repo.name)}"
-      title="Live preview of ${esc(repo.name)}" loading="lazy"
+      title="Live preview of ${esc(repo.name)}" loading="lazy" tabindex="-1"
       referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
   </div>`;
 }
@@ -387,6 +396,22 @@ const livePreviewObserver = new IntersectionObserver(entries => {
       return;
     }
     loadedLivePreviews.add(key);
+    // Embedded sites can steal focus on load (autofocused inputs, a stray
+    // .focus() call), which drags the whole page's scroll along with it —
+    // and cross-origin frames don't reliably fire a `focus` event on the
+    // <iframe> element itself when that happens, so poll for it instead.
+    // These frames are previews, not something a visitor tabs into — hand
+    // focus straight back and undo whatever scroll it caused.
+    const restoreX = window.scrollX, restoreY = window.scrollY;
+    let reclaimTicks = 0;
+    const reclaimFocus = () => {
+      if (document.activeElement === frame) {
+        frame.blur();
+        window.scrollTo(restoreX, restoreY);
+      }
+      if (++reclaimTicks < 180) requestAnimationFrame(reclaimFocus);
+    };
+    requestAnimationFrame(reclaimFocus);
     frame.src = frame.dataset.liveSrc;
   });
 }, { rootMargin: "180px" });
@@ -895,11 +920,21 @@ $("#editor-publish").addEventListener("click", async () => {
 
 /* ===================== COMMAND PALETTE ===================== */
 let paletteItems = [], paletteIndex = 0;
+function syncThemeToggle() {
+  const btn = $("#theme-toggle");
+  if (!btn) return;
+  const isLight = document.documentElement.dataset.theme === "light";
+  btn.innerHTML = isLight ? ICONS.moon : ICONS.sun;
+  btn.setAttribute("aria-label", isLight ? "Switch to dark theme" : "Switch to light theme");
+}
 function toggleTheme() {
   const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
   document.documentElement.dataset.theme = next;
   localStorage.setItem(THEME_KEY, next);
+  syncThemeToggle();
 }
+$("#theme-toggle").addEventListener("click", toggleTheme);
+syncThemeToggle();
 function paletteActions() {
   const nextTheme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
   const acts = [

@@ -437,11 +437,23 @@ h3 {
 
 .wrap { padding-inline: clamp(var(--space-md), 4vw, var(--space-xl)); }
 
-.command-trigger {
+.top-controls {
   position: fixed;
   inset-block-start: max(var(--space-md), env(safe-area-inset-top));
   inset-inline-end: max(var(--space-md), env(safe-area-inset-right));
   z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.top-controls .icon-btn {
+  background: var(--color-paper-2);
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.command-trigger {
   min-width: 44px;
   min-height: 44px;
   display: inline-flex;
