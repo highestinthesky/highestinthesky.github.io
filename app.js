@@ -202,6 +202,7 @@ async function validateGithubPages(repos) {
       /* A transient network or CORS failure is not evidence that a live page is gone. */
     }
   }));
+  return [...pageAvailability.values()].includes(false);
 }
 
 const isLive = (repo) => !!liveUrl(repo);
@@ -1081,21 +1082,29 @@ $("#show-forks").checked = !CONFIG.hideForks;
 /* ===================== BOOT ===================== */
 async function boot() {
   loadDraft();
-  try {
-    const res = await fetch("config.json?v=" + Date.now());
-    if (res.ok) PUBLISHED = await res.json();
-  } catch { PUBLISHED = {}; }
-
   if (CONFIG.username === "YOUR_GITHUB_USERNAME") {
     $("#hero-text").innerHTML = '<div class="state"><div class="big">Set your GitHub username</div>Open <code>app.js</code> and change <code>CONFIG.username</code> to your handle.</div>';
     return;
   }
   try {
-    PROFILE = await cachedJSON(`https://api.github.com/users/${CONFIG.username}`, "user:" + CONFIG.username);
-    REPOS = await gatherRepos();
-    await validateGithubPages(REPOS);
+    const [published, profile, repos] = await Promise.all([
+      fetch("config.json?v=" + Date.now())
+        .then(res => res.ok ? res.json() : {})
+        .catch(() => ({})),
+      cachedJSON(`https://api.github.com/users/${CONFIG.username}`, "user:" + CONFIG.username),
+      gatherRepos(),
+    ]);
+    PUBLISHED = published;
+    PROFILE = profile;
+    REPOS = repos;
     populateLangFilter();
     renderAllSections();
+    validateGithubPages(REPOS).then(hasMissingPage => {
+      if (hasMissingPage) {
+        loadedLivePreviews.clear();
+        renderAllSections();
+      }
+    }).catch(() => {});
   } catch (e) {
     $("#hero-text").innerHTML = `<div class="state"><div class="big">Couldn't load GitHub data</div>${
       String(e).includes("rate") ? "GitHub's hourly limit was hit — please try again shortly." :
