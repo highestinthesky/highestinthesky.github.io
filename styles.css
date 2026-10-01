@@ -871,3 +871,6 @@ h3 {
   .card { transition-duration: 150ms !important; }
   .topology-links line.is-live { stroke-dasharray: none; }
 }
+
+/* Passive repository images keep cards from running another site's scripts. */
+.site-preview .repo-image { object-fit: contain; }

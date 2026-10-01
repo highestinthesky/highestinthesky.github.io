@@ -94,3 +94,17 @@ You normally never edit this by hand — the site editor writes it. For referenc
 | `sections` | string[] | Which of `featured`, `languages`, `all` are shown, and in what order. Omit to show all three in that order. |
 
 Leave a field empty/absent to use defaults.
+
+## Mobile loading and verification
+
+Live project cards use lazy repository images. Tap a project card or its title to
+open the live website in a preview; closing the preview removes the embedded app.
+Fonts load without blocking the page's controls, and slow connections can keep
+the system font for that visit to avoid a late font swap.
+
+Run the startup tests with `node --test tests/startup.test.cjs`.
+For browser regression tests, install Playwright and its Chromium and WebKit
+browsers, serve this folder locally, then run `node tests/mobile.browser.cjs`.
+The default preview URL is `http://127.0.0.1:8765`; set `PORTFOLIO_URL` to use
+another URL. The tests stub external requests and check a stalled font stylesheet,
+passive project cards, preview cleanup, and layout at 320, 375, 414, and 768 px.

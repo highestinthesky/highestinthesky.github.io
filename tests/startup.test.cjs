@@ -63,9 +63,8 @@ test("renders GitHub data while live-site checks are still pending", async () =>
   await running;
 });
 
-test("refreshes missing-page labels without dropping loaded previews", async () => {
+test("refreshes missing-page labels after background validation", async () => {
   const h = startupHarness();
-  h.context.loadedLivePreviews = new Set(["example/sample"]);
   const running = h.context.boot();
   h.config.resolve({ ok: true, json: async () => ({}) });
   h.profile.resolve({ login: "example" });
@@ -74,5 +73,4 @@ test("refreshes missing-page labels without dropping loaded previews", async () 
   h.validation.resolve(true);
   await new Promise(setImmediate);
   assert.equal(h.calls.filter(call => call === "render").length, 2);
-  assert.equal(h.context.loadedLivePreviews.size, 0);
 });

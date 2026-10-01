@@ -10,12 +10,6 @@ const CONFIG = {
   images: {}        // e.g. { "repo": "https://example.com/screenshot.png" }
 };
 
-/* Loads take a moment (live API calls), so the browser's own scroll
-   restoration can land a reload halfway down a page that's since
-   reflowed — always start fresh at the top instead. */
-if ("scrollRestoration" in history) history.scrollRestoration = "manual";
-window.scrollTo(0, 0);
-
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -341,9 +335,8 @@ function projectMedia(repo, mode = "auto") {
   try { host = new URL(live).hostname; } catch {}
   return `<div class="project-media site-preview">
     <div class="site-preview__fallback"><strong>${esc(repo.name)}</strong><span>${esc(host)}</span></div>
-    <iframe data-live-src="${esc(live)}" data-live-key="${esc(ownerOf(repo) + "/" + repo.name)}"
-      title="Live preview of ${esc(repo.name)}" loading="lazy" tabindex="-1"
-      referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
+    <img class="repo-image" src="${esc(repoImage(repo))}" alt="GitHub repository preview of ${esc(repo.name)}"
+      width="1200" height="600" loading="lazy" decoding="async" />
   </div>`;
 }
 
@@ -378,7 +371,6 @@ function repoCard(repo, { mediaMode = "auto" } = {}) {
 const SOURCE_EXTENSIONS = /\.(?:html?|css|scss|js|jsx|mjs|ts|tsx|py|rb|php|go|rs|java|kt|kts|swift|c|cc|cpp|h|hpp|cs|vue|svelte)$/i;
 const SOURCE_EXCLUDES = /(^|\/)(?:dist|build|vendor|node_modules|coverage|\.next|docs?\/generated)(\/|$)|(?:\.min\.|package-lock|yarn\.lock|pnpm-lock)/i;
 const sourceCache = new Map();
-const loadedLivePreviews = new Set();
 const codePreviewObserver = new IntersectionObserver(entries => {
   entries.forEach(entry => {
     if (!entry.isIntersecting) return;
@@ -386,36 +378,6 @@ const codePreviewObserver = new IntersectionObserver(entries => {
     loadCodePreview(entry.target);
   });
 }, { rootMargin: "220px" });
-const livePreviewObserver = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (!entry.isIntersecting) return;
-    const frame = entry.target;
-    livePreviewObserver.unobserve(frame);
-    const key = frame.dataset.liveKey;
-    if (loadedLivePreviews.has(key)) {
-      frame.remove();
-      return;
-    }
-    loadedLivePreviews.add(key);
-    // Embedded sites can steal focus on load (autofocused inputs, a stray
-    // .focus() call), which drags the whole page's scroll along with it —
-    // and cross-origin frames don't reliably fire a `focus` event on the
-    // <iframe> element itself when that happens, so poll for it instead.
-    // These frames are previews, not something a visitor tabs into — hand
-    // focus straight back and undo whatever scroll it caused.
-    const restoreX = window.scrollX, restoreY = window.scrollY;
-    let reclaimTicks = 0;
-    const reclaimFocus = () => {
-      if (document.activeElement === frame) {
-        frame.blur();
-        window.scrollTo(restoreX, restoreY);
-      }
-      if (++reclaimTicks < 180) requestAnimationFrame(reclaimFocus);
-    };
-    requestAnimationFrame(reclaimFocus);
-    frame.src = frame.dataset.liveSrc;
-  });
-}, { rootMargin: "180px" });
 
 // Below this, a file is almost always a near-empty stub (e.g. SvelteKit's
 // placeholder `$lib/index.js`) rather than anything worth previewing.
@@ -522,7 +484,6 @@ function hydrateCodePreviews(scope) {
 
 function hydrateProjectMedia(scope) {
   hydrateCodePreviews(scope);
-  $$("iframe[data-live-src]", scope || document).forEach(frame => livePreviewObserver.observe(frame));
 }
 
 /* ===================== VISIBLE / FEATURED LOGIC ===================== */
@@ -1101,7 +1062,6 @@ async function boot() {
     renderAllSections();
     validateGithubPages(REPOS).then(hasMissingPage => {
       if (hasMissingPage) {
-        loadedLivePreviews.clear();
         renderAllSections();
       }
     }).catch(() => {});
