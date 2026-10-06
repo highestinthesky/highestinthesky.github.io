@@ -14,6 +14,8 @@ A self-updating showcase of your GitHub work. It reads your profile and **all pu
 | `index.html` | Markup only. |
 | `styles.css` | All visual design (colours, type, layout, motion). |
 | `app.js` | All behaviour — GitHub API calls, rendering, the site editor, publishing. |
+| `flair.js` | Optional anime.js card assembly, animated sorting, cursor ink, and motion preferences. |
+| `vendor/` | Locally served anime.js 4.5.0 and its MIT license. |
 | `site-settings.js` | GitHub account settings and shared live URL / snapshot rules. |
 | `config.json` | The published, global content overrides. Edited by the site editor, not by hand. |
 | `snapshots/` | Saved JPEG screenshots of the public live pages. |
@@ -39,7 +41,7 @@ That's the only edit needed to go live.
 ## 2. Deploy to GitHub Pages
 
 1. Create a repo named exactly **`USERNAME.github.io`** (use your own handle).
-2. Add this project's files, including `site-settings.js`, `tokens.css`, `snapshots/`, and `.github/workflows/refresh-snapshots.yml`.
+2. Add this project's files, including `site-settings.js`, `tokens.css`, `flair.js`, `vendor/`, `snapshots/`, and `.github/workflows/refresh-snapshots.yml`.
 3. In the repo: **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / root**.
 4. Wait about a minute, then visit `https://USERNAME.github.io`.
 
@@ -102,6 +104,20 @@ Leave a field empty/absent to use defaults.
 
 ## Mobile loading and verification
 
+The wave button in the top controls pauses or resumes visual effects and saves
+that preference in this browser. System reduced-motion preferences take priority.
+Cards assemble once when they first enter the viewport, then move between their
+slots when the Index is filtered or sorted. The native mouse cursor leaves short
+amber, teal, and rust ink strokes; touch screens have no cursor effect. Ink clears
+while scrolling, typing, or using a preview or editor, and expires when the mouse
+stops. Effects pause when the page is hidden. The portfolio stays functional if
+the animation library cannot load, and starts independently of that download.
+
+The production page serves anime.js from `vendor/`, with no build step or CDN
+dependency. Its source version is pinned in `package.json`; when updating it,
+copy `node_modules/animejs/dist/bundles/anime.umd.min.js` and
+`node_modules/animejs/LICENSE.md` to their corresponding files in `vendor/`.
+
 Live project cards use lazy screenshots of the public website. Tap a project card or its title to
 open the live website in a preview; closing the preview removes the embedded app.
 Fonts load without blocking the page's controls, and slow connections can keep
@@ -113,6 +129,8 @@ serve this folder locally, then run `npm run test:browser`.
 The default preview URL is `http://127.0.0.1:8765`; set `PORTFOLIO_URL` to use
 another URL. The tests stub external requests and check a stalled font stylesheet,
 passive project cards, preview cleanup, and layout at 320, 375, 414, and 768 px.
+They also check animated sorting, focus retention, bounded cursor ink, pausing,
+runtime reduced-motion changes, and a stalled or missing animation library.
 
 ## Saved live page snapshots
 

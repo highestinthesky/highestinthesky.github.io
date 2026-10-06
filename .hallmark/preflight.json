@@ -1,8 +1,8 @@
 {
-  "date": "2026-09-20",
+  "date": "2026-10-06",
   "font_stack": "Tomorrow + IBM Plex Sans + IBM Plex Mono (Google Fonts, index.html)",
   "palette": "OKLCH custom properties in tokens.css; dark-first Midnight palette with light command variant",
-  "motion": "Native CSS and browser APIs; no motion library",
+  "motion": "Anime.js 4.5.0, served locally and loaded asynchronously; finite card assembly and sorting, cursor ink, pause control and system reduced-motion support",
   "spacing": "Named 4-point CSS token scale",
   "framework": "Vanilla HTML, CSS, and JavaScript",
   "preserved": [

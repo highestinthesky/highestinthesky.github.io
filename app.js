@@ -50,8 +50,42 @@ function ownerTag(repo) {
   return o.toLowerCase() === CONFIG.username.toLowerCase() ? "" : `<span class="owner-tag" title="Owned by ${esc(o)}">${esc(o)}</span>`;
 }
 
-/* Content arrives without scroll theatre; the live workbench carries the motion. */
-function observeReveal() {}
+function observeReveal(scope) { window.PortfolioFlair?.observeGrid(scope); }
+
+// Reuse cards so sorting can move them and retain loaded previews and focus.
+function renderRepoGrid(grid, repos, options) {
+  const update = () => {
+    const focused = grid.contains(document.activeElement) ? document.activeElement : null;
+    const existing = new Map($$("[data-card]", grid).map(card => [card.dataset.projectKey, card]));
+    const desired = repos.map(repo => {
+      const projectKey = `${ownerOf(repo)}/${repo.name}`;
+      const markup = repoCard(repo, options);
+      let card = existing.get(projectKey);
+      if (!card || card.portfolioMarkup !== markup) {
+        const template = document.createElement("template");
+        template.innerHTML = markup;
+        const replacement = template.content.firstElementChild;
+        replacement.portfolioMarkup = markup;
+        if (card) card.replaceWith(replacement);
+        card = replacement;
+      }
+      return card;
+    });
+    const keep = new Set(desired);
+    [...grid.children].forEach(child => { if (!keep.has(child)) child.remove(); });
+    let cursor = grid.firstElementChild;
+    desired.forEach(card => {
+      if (card === cursor) cursor = cursor.nextElementSibling;
+      else if (grid.moveBefore && card.parentElement === grid) grid.moveBefore(card, cursor);
+      else grid.insertBefore(card, cursor);
+    });
+    if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
+  };
+  if (window.PortfolioFlair) window.PortfolioFlair.updateGrid(grid, update);
+  else update();
+  hydrateProjectMedia(grid);
+  observeReveal(grid);
+}
 
 /* ===================== STATE ===================== */
 let PROFILE = null;
@@ -329,7 +363,7 @@ function repoCard(repo, { mediaMode = "auto" } = {}) {
   let updated = "";
   try { updated = new Date(repo.pushed_at).toLocaleDateString(undefined, { month: "short", year: "numeric" }); } catch {}
   return `
-  <article class="card" data-card data-name="${esc(repo.name)}">
+  <article class="card" data-card data-name="${esc(repo.name)}" data-project-key="${esc(ownerOf(repo) + "/" + repo.name)}">
     ${projectMedia(repo, mediaMode)}
     <div class="card-body">
       <div class="top">
@@ -506,9 +540,7 @@ function renderFeatured() {
   if (!feats.length) { sec.style.display = "none"; return; }
   if ((OVERRIDES.sections || []).includes("featured")) sec.style.display = "";
   $("#featured-count").textContent = feats.length + (feats.length === 1 ? " project" : " projects");
-  $("#featured-grid").innerHTML = feats.map(r => repoCard(r)).join("");
-  hydrateProjectMedia($("#featured-grid"));
-  observeReveal($("#featured-grid"));
+  renderRepoGrid($("#featured-grid"), feats);
 }
 
 /* ===================== RENDER: LANGUAGES ===================== */
@@ -567,10 +599,8 @@ function renderAll() {
 
   $("#all-count").textContent = list.length + (list.length === 1 ? " project" : " projects");
   const grid = $("#repo-grid");
-  if (!list.length) { grid.innerHTML = '<div class="state"><div class="big">No projects match.</div>Try clearing the filter or search.</div>'; return; }
-  grid.innerHTML = list.map(r => repoCard(r, { mediaMode: "code" })).join("");
-  hydrateProjectMedia(grid);
-  observeReveal(grid);
+  renderRepoGrid(grid, list, { mediaMode: "code" });
+  if (!list.length) grid.innerHTML = '<div class="state"><div class="big">No projects match.</div>Try clearing the filter or search.</div>';
 }
 
 /* ===================== SECTION ARRANGEMENT ===================== */
@@ -1032,12 +1062,8 @@ document.addEventListener("click", (e) => {
 
 /* ===================== WIRE UP CONTROLS ===================== */
 $("#show-forks").checked = !CONFIG.hideForks;
-["input", "change"].forEach(ev => {
-  $("#search").addEventListener(ev, renderAll);
-  $("#lang-filter").addEventListener("change", renderAll);
-  $("#sort").addEventListener("change", renderAll);
-  $("#show-forks").addEventListener("change", renderAll);
-});
+$("#search").addEventListener("input", renderAll);
+["#lang-filter", "#sort", "#show-forks"].forEach(selector => $(selector).addEventListener("change", renderAll));
 
 /* ===================== BOOT ===================== */
 async function boot() {
