@@ -21,5 +21,43 @@
     "videogame_revenue_raw",
     "hazoc",
     "wordlebot"
-  ]
+  ],
+  "snapshotRefreshHours": 168,
+  "snapshots": {
+    "highestinthesky/daily-words": {
+      "url": "https://highestinthesky.github.io/daily-words/",
+      "image": "snapshots/highestinthesky/daily-words.jpg",
+      "capturedAt": "2026-10-06T13:21:21.090Z"
+    },
+    "highestinthesky/frc-scouting-app": {
+      "url": "https://highestinthesky.github.io/frc-scouting-app/",
+      "image": "snapshots/highestinthesky/frc-scouting-app.jpg",
+      "capturedAt": "2026-10-06T13:21:21.090Z"
+    },
+    "highestinthesky/word-games": {
+      "url": "https://highestinthesky.github.io/word-games/",
+      "image": "snapshots/highestinthesky/word-games.jpg",
+      "capturedAt": "2026-10-06T13:21:21.090Z"
+    },
+    "highestinthesky/algorithm-visualizer": {
+      "url": "https://highestinthesky.github.io/algorithm-visualizer/",
+      "image": "snapshots/highestinthesky/algorithm-visualizer.jpg",
+      "capturedAt": "2026-10-06T13:21:21.090Z"
+    },
+    "highestinthesky/password-manager": {
+      "url": "https://highestinthesky.github.io/password-manager/",
+      "image": "snapshots/highestinthesky/password-manager.jpg",
+      "capturedAt": "2026-10-06T13:21:21.090Z"
+    },
+    "highestinthesky/rohawks-centerpiece": {
+      "url": "https://highestinthesky.github.io/rohawks-centerpiece/",
+      "image": "snapshots/highestinthesky/rohawks-centerpiece.jpg",
+      "capturedAt": "2026-10-06T13:21:21.090Z"
+    },
+    "highestinthesky/wordlebot": {
+      "url": "https://highestinthesky.github.io/wordlebot/",
+      "image": "snapshots/highestinthesky/wordlebot.jpg",
+      "capturedAt": "2026-10-06T13:21:21.090Z"
+    }
+  }
 }

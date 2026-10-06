@@ -761,6 +761,18 @@ h3 {
 }
 .site-preview__fallback strong { color: var(--color-ink); font-family: var(--font-display); font-size: var(--text-md); }
 .repo-image { object-fit: cover; }
+.repo-image[hidden] { display: none; }
+.snapshot-date {
+  position: absolute;
+  inset-inline-start: var(--space-sm);
+  inset-block-end: var(--space-sm);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background: var(--color-paper);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
 
 .code-preview {
   height: 100%;

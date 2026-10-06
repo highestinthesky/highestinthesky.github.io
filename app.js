@@ -1,14 +1,4 @@
-const CONFIG = {
-  username: "highestinthesky",
-  email: "yaseru2003@gmail.com",
-  repo: null,
-  hideForks: false,
-  hideArchived: false,
-  cacheMinutes: 10,
-  orgs: [],
-  extraRepos: ["Rohawklings/32863-ftc"],
-  images: {}        // e.g. { "repo": "https://example.com/screenshot.png" }
-};
+const CONFIG = SiteSettings.CONFIG;
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -55,11 +45,6 @@ const ICONS = {
 };
 
 const ownerOf = (repo) => (repo.owner && repo.owner.login) || CONFIG.username;
-function ogImage(repo) {
-  const cb = encodeURIComponent(repo.pushed_at || String(repo.id) || "1");
-  return `https://opengraph.githubassets.com/${cb}/${ownerOf(repo)}/${repo.name}`;
-}
-const repoImage = (repo) => (CONFIG.images && CONFIG.images[repo.name]) || ogImage(repo);
 function ownerTag(repo) {
   const o = ownerOf(repo);
   return o.toLowerCase() === CONFIG.username.toLowerCase() ? "" : `<span class="owner-tag" title="Owned by ${esc(o)}">${esc(o)}</span>`;
@@ -97,6 +82,8 @@ function computeOverrides() {
     unfeatured: DRAFT.unfeatured ?? PUBLISHED.unfeatured ?? [],
     order:      DRAFT.order      ?? PUBLISHED.order      ?? [],
     sections:   DRAFT.sections   ?? PUBLISHED.sections   ?? DEFAULT_SECTIONS,
+    snapshotRefreshHours: SiteSettings.refreshHours({ snapshotRefreshHours: DRAFT.snapshotRefreshHours ?? PUBLISHED.snapshotRefreshHours }),
+    snapshots: PUBLISHED.snapshots || {},
   };
 }
 
@@ -144,19 +131,7 @@ async function gatherRepos() {
 
 /* ===================== PAGES URL ===================== */
 function pagesUrl(repo) {
-  if (repo.homepage && /^https?:\/\//.test(repo.homepage)) {
-    try {
-      const homepage = new URL(repo.homepage);
-      if (homepage.hostname.toLowerCase().endsWith(".github.io")) homepage.protocol = "https:";
-      return homepage.href;
-    } catch { return repo.homepage; }
-  }
-  if (repo.has_pages) {
-    const owner = (repo.owner && repo.owner.login) || CONFIG.username;
-    if (repo.name.toLowerCase() === (owner + ".github.io").toLowerCase()) return `https://${owner}.github.io/`;
-    return `https://${owner}.github.io/${repo.name}/`;
-  }
-  return null;
+  return SiteSettings.pagesUrl(repo, CONFIG);
 }
 const pageAvailability = new Map();
 
@@ -320,10 +295,21 @@ function codePreviewMarkup(repo) {
 }
 
 function projectMedia(repo, mode = "auto") {
-  if (mode === "code" || isPage404(repo)) return codePreviewMarkup(repo);
+  if (mode === "code") return codePreviewMarkup(repo);
   const customImage = (CONFIG.images && CONFIG.images[repo.name]) || "";
   if (customImage) {
     return `<div class="project-media"><img class="repo-image" src="${esc(customImage)}" alt="${esc(repo.name)} project preview" loading="lazy" /></div>`;
+  }
+  const snapshot = SiteSettings.snapshotFor(repo, OVERRIDES, CONFIG);
+  if (snapshot) {
+    const date = new Date(snapshot.capturedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return `<div class="project-media site-preview">
+      <div class="site-preview__fallback" aria-hidden="true"><strong>${esc(repo.name)}</strong><span>Snapshot unavailable</span></div>
+      <img class="repo-image" src="${esc(snapshot.image)}?v=${encodeURIComponent(snapshot.capturedAt)}"
+        alt="Screenshot of ${esc(repo.name)}" width="1200" height="750" loading="lazy" decoding="async"
+        onerror="this.hidden=true;this.previousElementSibling.removeAttribute('aria-hidden');this.nextElementSibling.hidden=true" />
+      <span class="snapshot-date" title="Captured ${esc(snapshot.capturedAt)}">Snapshot · ${esc(date)}</span>
+    </div>`;
   }
   const live = liveUrl(repo);
   const portfolioRepo = (CONFIG.repo || `${CONFIG.username}/${CONFIG.username}.github.io`).split("/").pop().toLowerCase();
@@ -334,9 +320,7 @@ function projectMedia(repo, mode = "auto") {
   let host = live;
   try { host = new URL(live).hostname; } catch {}
   return `<div class="project-media site-preview">
-    <div class="site-preview__fallback"><strong>${esc(repo.name)}</strong><span>${esc(host)}</span></div>
-    <img class="repo-image" src="${esc(repoImage(repo))}" alt="GitHub repository preview of ${esc(repo.name)}"
-      width="1200" height="600" loading="lazy" decoding="async" />
+    <div class="site-preview__fallback"><strong>${esc(repo.name)}</strong><span>${esc(host)}</span><span>Snapshot pending</span></div>
   </div>`;
 }
 
@@ -647,7 +631,14 @@ function buildEditor() {
   buildArrangeControls();
   buildRepoControls();
   buildConnectControls();
+  $("#cfg-snapshot-hours").value = String(OVERRIDES.snapshotRefreshHours);
+  $("#snapshot-refresh-link").href = `https://github.com/${repoSlug()}/actions/workflows/refresh-snapshots.yml`;
 }
+
+$("#cfg-snapshot-hours").addEventListener("change", () => {
+  DRAFT.snapshotRefreshHours = Number($("#cfg-snapshot-hours").value);
+  saveDraft(); computeOverrides();
+});
 
 /* ---- profile inputs ---- */
 let cfgTimer;
@@ -821,7 +812,7 @@ $("#gh-disconnect").addEventListener("click", () => {
   toast("Disconnected");
 });
 
-function buildConfigObject() {
+function buildConfigObject(latestPublished = PUBLISHED) {
   computeOverrides();
   const out = {};
   if (OVERRIDES.name) out.name = OVERRIDES.name;
@@ -832,6 +823,9 @@ function buildConfigObject() {
   if (OVERRIDES.unfeatured?.length) out.unfeatured = OVERRIDES.unfeatured;
   if (OVERRIDES.order?.length) out.order = OVERRIDES.order;
   if (OVERRIDES.sections?.length && JSON.stringify(OVERRIDES.sections) !== JSON.stringify(DEFAULT_SECTIONS)) out.sections = OVERRIDES.sections;
+  out.snapshotRefreshHours = OVERRIDES.snapshotRefreshHours;
+  // Captures are managed by the job; keep its latest metadata when publishing an older draft.
+  if (latestPublished.snapshots) out.snapshots = latestPublished.snapshots;
   return out;
 }
 
@@ -852,14 +846,19 @@ $("#editor-publish").addEventListener("click", async () => {
 
   btn.disabled = true; btn.textContent = "Publishing…";
   try {
-    let sha;
+    let sha, latestPublished = {};
     const cur = await fetch(url, { headers });
-    if (cur.ok) { sha = (await cur.json()).sha; }
+    if (cur.ok) {
+      const file = await cur.json();
+      sha = file.sha;
+      latestPublished = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g, "")), c => c.charCodeAt(0))));
+    }
     else if (cur.status !== 404) throw new Error(`Couldn't read the current config.json (${cur.status}). Try again in a moment.`);
 
+    const nextConfig = buildConfigObject(latestPublished);
     const body = {
       message: "Update config.json via site editor",
-      content: b64EncodeUnicode(JSON.stringify(buildConfigObject(), null, 2) + "\n"),
+      content: b64EncodeUnicode(JSON.stringify(nextConfig, null, 2) + "\n"),
     };
     if (sha) body.sha = sha;
 
@@ -869,7 +868,7 @@ $("#editor-publish").addEventListener("click", async () => {
     if (put.status === 409) throw new Error("The published file changed since this draft was made. Reset the draft and reapply your edits.");
     if (!put.ok) throw new Error(`GitHub rejected the publish (${put.status}). Try again in a moment.`);
 
-    PUBLISHED = buildConfigObject();
+    PUBLISHED = nextConfig;
     DRAFT = {}; saveDraft();
     renderAllSections(); buildEditor();
     toast("Published — live for everyone in about a minute.");
@@ -1044,7 +1043,7 @@ $("#show-forks").checked = !CONFIG.hideForks;
 async function boot() {
   loadDraft();
   if (CONFIG.username === "YOUR_GITHUB_USERNAME") {
-    $("#hero-text").innerHTML = '<div class="state"><div class="big">Set your GitHub username</div>Open <code>app.js</code> and change <code>CONFIG.username</code> to your handle.</div>';
+    $("#hero-text").innerHTML = '<div class="state"><div class="big">Set your GitHub username</div>Open <code>site-settings.js</code> and change <code>CONFIG.username</code> to your handle.</div>';
     return;
   }
   try {

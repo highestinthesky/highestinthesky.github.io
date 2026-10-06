@@ -1,0 +1,83 @@
+name: Refresh live page snapshots
+
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Refresh all screenshots, even if still fresh
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - 'site-settings.js'
+      - 'scripts/capture-snapshots.cjs'
+      - 'config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/refresh-snapshots.yml'
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: portfolio-snapshots
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: Capture public pages
+        id: capture
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FORCE_REFRESH: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+        run: |
+          if [ "$FORCE_REFRESH" = "true" ]; then
+            npm run snapshots -- --force
+          else
+            npm run snapshots
+          fi
+      - name: Save successful captures
+        run: |
+          git add config.json
+          if [ -d snapshots ]; then git add snapshots/; fi
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Refresh live page snapshots'
+            # Stop on a concurrent edit rather than overwrite settings or captures.
+            git push origin HEAD:main
+          fi
+      - name: Rebuild Pages if the saved revision has not deployed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest_build=$(gh api "repos/$GITHUB_REPOSITORY/pages/builds/latest" --jq '[.commit, .status] | @tsv')
+          read -r build_commit build_status <<< "$latest_build"
+          # Also runs when captures are fresh, so a previously failed build request is retried.
+          # GITHUB_TOKEN commits do not automatically trigger branch-based Pages builds.
+          if [ "$build_commit" != "$(git rev-parse HEAD)" ] || [ "$build_status" = "errored" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds"
+          fi
+      - name: Report failed captures
+        if: steps.capture.outcome == 'failure'
+        run: |
+          echo 'Some pages could not be captured. Successful captures were saved; previous images were retained for failures.'
+          exit 1

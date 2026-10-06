@@ -173,6 +173,21 @@
       </div>
 
       <div class="editor-group">
+        <h4>Live page snapshots</h4>
+        <p class="editor-note">Cards show saved screenshots of the public pages. Failed captures keep the previous image.</p>
+        <div class="editor-input-row">
+          <label for="cfg-snapshot-hours">Refresh screenshots</label>
+          <select class="editor-input" id="cfg-snapshot-hours">
+            <option value="24">Daily</option>
+            <option value="168">Weekly</option>
+            <option value="720">Every 30 days</option>
+          </select>
+        </div>
+        <a class="btn" id="snapshot-refresh-link" target="_blank" rel="noopener">Refresh now on GitHub</a>
+        <p class="editor-note">Choose “Run workflow” to capture new screenshots now. Publish interval changes to apply them for everyone.</p>
+      </div>
+
+      <div class="editor-group">
         <h4>Publish</h4>
         <p class="editor-note" id="connect-note" style="margin-bottom: var(--space-sm)">
           Edits above preview instantly for you only. Connect GitHub once to publish them for every visitor with one click — no visiting github.com.
@@ -203,6 +218,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="site-settings.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
