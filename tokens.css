@@ -20,6 +20,9 @@
   --color-error: oklch(72% 0.155 28);
   --color-error-ink: oklch(16% 0.018 28);
   --color-success: oklch(74% 0.110 145);
+  --color-ink-trail: var(--color-accent);
+  --color-ink-trail-alt: oklch(79% 0.105 185);
+  --color-ink-trail-third: oklch(75% 0.145 35);
 
   --color-graphite: var(--color-paper-2);
   --color-graphite-2: var(--color-paper-3);
@@ -101,6 +104,8 @@
   --color-accent-ink: oklch(98% 0.008 80);
   --color-accent-wash: oklch(91% 0.042 60);
   --color-focus: oklch(48% 0.175 54);
+  --color-ink-trail-alt: oklch(55% 0.105 185);
+  --color-ink-trail-third: oklch(57% 0.145 35);
   --color-graphite: var(--color-paper-2);
   --color-graphite-2: var(--color-paper-3);
   --color-on-graphite: var(--color-ink);

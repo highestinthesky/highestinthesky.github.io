@@ -18,6 +18,10 @@
 <body>
 
 <div class="top-controls">
+  <button class="motion-toggle" id="motion-toggle" type="button" aria-label="Pause visual effects" aria-pressed="true" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M3 12c3-10 6 10 9 0s6 10 9 0" /></svg>
+    <span>Motion on</span>
+  </button>
   <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch theme"></button>
   <button class="command-trigger" id="palette-open" type="button" aria-label="Open project command palette">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -218,7 +222,8 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="site-settings.js"></script>
-<script src="app.js"></script>
+<script src="site-settings.js" defer></script>
+<script src="app.js" defer></script>
+<script src="flair.js" defer></script>
 </body>
 </html>
