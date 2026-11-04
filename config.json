@@ -27,7 +27,7 @@
     "highestinthesky/daily-words": {
       "url": "https://highestinthesky.github.io/daily-words/",
       "image": "snapshots/highestinthesky/daily-words.jpg",
-      "capturedAt": "2026-10-28T16:02:20.523Z"
+      "capturedAt": "2026-11-04T17:14:43.946Z"
     },
     "highestinthesky/frc-scouting-app": {
       "url": "https://scout.rohawks.org/",
@@ -37,32 +37,37 @@
     "highestinthesky/word-games": {
       "url": "https://highestinthesky.github.io/word-games/",
       "image": "snapshots/highestinthesky/word-games.jpg",
-      "capturedAt": "2026-10-28T16:02:20.523Z"
+      "capturedAt": "2026-11-04T17:14:43.946Z"
     },
     "highestinthesky/algorithm-visualizer": {
       "url": "https://highestinthesky.github.io/algorithm-visualizer/",
       "image": "snapshots/highestinthesky/algorithm-visualizer.jpg",
-      "capturedAt": "2026-10-28T16:02:20.523Z"
+      "capturedAt": "2026-11-04T17:14:43.946Z"
     },
     "highestinthesky/password-manager": {
       "url": "https://highestinthesky.github.io/password-manager/",
       "image": "snapshots/highestinthesky/password-manager.jpg",
-      "capturedAt": "2026-10-28T16:02:20.523Z"
+      "capturedAt": "2026-11-04T17:14:43.946Z"
     },
     "highestinthesky/rohawks-centerpiece": {
       "url": "https://highestinthesky.github.io/rohawks-centerpiece/",
       "image": "snapshots/highestinthesky/rohawks-centerpiece.jpg",
-      "capturedAt": "2026-10-28T16:02:20.523Z"
+      "capturedAt": "2026-11-04T17:14:43.946Z"
     },
     "highestinthesky/wordlebot": {
       "url": "https://highestinthesky.github.io/wordlebot/",
       "image": "snapshots/highestinthesky/wordlebot.jpg",
-      "capturedAt": "2026-10-28T16:02:20.523Z"
+      "capturedAt": "2026-11-04T17:14:43.946Z"
     },
     "highestinthesky/spanish-practice": {
       "url": "https://highestinthesky.github.io/spanish-practice/",
       "image": "snapshots/highestinthesky/spanish-practice.jpg",
       "capturedAt": "2026-10-30T15:56:22.939Z"
+    },
+    "highestinthesky/applications-for-xenia": {
+      "url": "https://highestinthesky.github.io/applications-for-xenia/",
+      "image": "snapshots/highestinthesky/applications-for-xenia.jpg",
+      "capturedAt": "2026-11-04T17:14:43.946Z"
     }
   }
 }
